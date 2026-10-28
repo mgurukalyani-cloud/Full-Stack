@@ -1,0 +1,4 @@
+# Wokwi Library Dependencies for Smart Campus Monitoring
+LiquidCrystal I2C
+DHT sensor library
+Adafruit Unified Sensor

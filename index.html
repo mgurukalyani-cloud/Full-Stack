@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Campus Digital Twin Command Center | SIH 2026</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Three.js + OrbitControls + TWEEN.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+  <!-- Chart.js for AI Analytics Dashboard -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      overflow: hidden;
+      background-color: #030712;
+      color: #f1f5f9;
+      user-select: none;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Glassmorphism Panels */
+    .glass-panel {
+      background: rgba(10, 16, 31, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.18);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .glass-card {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glow-emergency {
+      box-shadow: 0 0 35px rgba(239, 68, 68, 0.85);
+      animation: emergency-strobe 1s infinite alternate;
+    }
+
+    @keyframes emergency-strobe {
+      from { box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 0.6); }
+      to { box-shadow: 0 0 45px rgba(239, 68, 68, 1); border-color: rgba(239, 68, 68, 1); }
+    }
+
+    /* Smooth Collapsible Sliding */
+    .panel-transition {
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+    ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.35); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.7); }
+
+    /* Tooltip */
+    #sensor-hover-tooltip {
+      pointer-events: none;
+      transition: opacity 0.15s ease-out;
+      transform: translate(-50%, -120%);
+    }
+
+    /* Bounding Box for CCTV */
+    .yolo-box {
+      border: 2px solid #ef4444;
+      background: rgba(239, 68, 68, 0.15);
+      animation: yolo-pulse 0.9s infinite alternate;
+    }
+    @keyframes yolo-pulse {
+      from { border-color: #ef4444; }
+      to { border-color: #fbbf24; }
+    }
+  </style>
+</head>
+<body class="w-screen h-screen relative bg-[#030712] text-slate-100 overflow-hidden">
+
+  <!-- 3D Three.js WebGL Canvas (Full Background Viewport) -->
+  <div id="webgl-container" class="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"></div>
+
+  <!-- FLOATING SENSOR HOVER TOOLTIP -->
+  <div id="sensor-hover-tooltip" class="fixed top-0 left-0 hidden z-50 glass-panel rounded-xl p-3 border border-cyan-400/40 shadow-2xl max-w-xs">
+    <div class="flex items-center gap-2 mb-1.5">
+      <span id="tt-icon" class="text-base">📹</span>
+      <div>
+        <h4 id="tt-name" class="text-xs font-bold text-white uppercase font-mono">CCTV North Corridor</h4>
+        <span id="tt-room" class="text-[11px] text-cyan-300 font-mono">Room: 1F Corridor</span>
+      </div>
+    </div>
+    <div class="space-y-1 text-xs font-mono border-t border-slate-700/60 pt-1.5">
+      <div class="flex justify-between text-slate-400">Status: <span id="tt-status" class="text-emerald-400 font-bold">ONLINE</span></div>
+      <div class="flex justify-between text-slate-400">Reading: <span id="tt-reading" class="text-white">30 FPS | Normal</span></div>
+      <div class="text-[10px] text-slate-400 leading-tight pt-1 border-t border-slate-800">Hardware: <span id="tt-spec" class="text-slate-300">ESP32-CAM AI Vision Edge Node</span></div>
+    </div>
+  </div>
+
+  <!-- FLOATING MINI ALERT CHIP DURING DEMO MODE -->
+  <div id="demo-floating-alert" class="fixed top-24 left-1/2 -translate-x-1/2 glass-panel rounded-full px-5 py-2 z-40 hidden items-center gap-3 border border-cyan-400/40 shadow-2xl">
+    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+    <span id="demo-alert-text" class="text-xs font-mono font-bold text-cyan-300">ALL CAMPUS SYSTEMS NOMINAL</span>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TOP HEADER & COMMAND NAVIGATION                                           -->
+  <!-- ========================================================================= -->
+  <header class="absolute top-0 left-0 right-0 h-16 glass-panel border-b border-cyan-500/20 z-30 flex items-center justify-between px-5 shadow-2xl">
+    <!-- Brand / Status -->
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
+        <i data-lucide="shield-alert" class="w-5 h-5 text-white"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-extrabold tracking-wider text-white uppercase font-mono">CAMPUSGUARD 360°</h1>
+          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">DIGITAL TWIN v3.0</span>
+          <span id="badge-live-pulse" class="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> LIVE MESH
+          </span>
+        </div>
+        <p class="text-[11px] text-slate-400 hidden xl:block">Autonomous Multi-Floor Safety, AI CCTV Analytics & Hazard Mitigation</p>
+      </div>
+    </div>
+
+    <!-- Quick Stats Ticker (PRESERVED) -->
+    <div class="hidden 2xl:flex items-center gap-4 font-mono text-xs">
+      <div class="flex items-center gap-1.5"><span class="text-slate-400">BUILDING:</span><span class="text-cyan-300 font-bold">TECH BLOCK A</span></div>
+      <div class="h-3.5 w-px bg-slate-700"></div>
+      <div class="flex items-center gap-1.5"><span class="text-slate-400">OCCUPANCY:</span><span id="stat-occupancy" class="text-emerald-400 font-bold">142 / 280</span></div>
+      <div class="h-3.5 w-px bg-slate-700"></div>
+      <div class="flex items-center gap-1.5"><span class="text-slate-400">TEMP:</span><span id="stat-temp" class="text-amber-300 font-bold">23.4°C</span></div>
+      <div class="h-3.5 w-px bg-slate-700"></div>
+      <div class="flex items-center gap-1.5"><span class="text-slate-400">NODES:</span><span class="text-cyan-400 font-bold">18 ONLINE</span></div>
+      <div class="h-3.5 w-px bg-slate-700"></div>
+      <div class="flex items-center gap-1.5"><span class="text-slate-400">ALERTS:</span><span id="stat-alerts" class="text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-emerald-500/10">0 CRITICAL</span></div>
+    </div>
+
+    <!-- Floor View Buttons (NEW REQUIREMENT) -->
+    <div class="hidden lg:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/60 font-mono text-xs">
+      <button onclick="setFloorFilter('ALL')" id="flt-all" class="px-2.5 py-1 rounded-lg bg-cyan-600 text-white font-bold shadow transition-all">All Floors</button>
+      <button onclick="setFloorFilter('GF')" id="flt-gf" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all">Ground Floor</button>
+      <button onclick="setFloorFilter('1F')" id="flt-1f" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all">First Floor</button>
+      <button onclick="setFloorFilter('2F')" id="flt-2f" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all">Second Floor</button>
+    </div>
+
+    <!-- View Switcher Tabs (PRESERVED & EXPANDED) -->
+    <div class="hidden md:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/60 font-mono text-xs">
+      <button onclick="switchViewMode('3d')" id="tab-3d" class="px-2.5 py-1 rounded-lg bg-cyan-600 text-white font-bold transition-all flex items-center gap-1.5">
+        <i data-lucide="box" class="w-3.5 h-3.5"></i> 3D Model
+      </button>
+      <button onclick="switchViewMode('cctv')" id="tab-cctv" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+        <i data-lucide="cctv" class="w-3.5 h-3.5"></i> AI CCTV Wall
+      </button>
+      <button onclick="switchViewMode('sensors')" id="tab-sensors" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+        <i data-lucide="cpu" class="w-3.5 h-3.5"></i> IoT Grid
+      </button>
+      <button onclick="switchViewMode('analytics')" id="tab-analytics" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+        <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i> AI Analytics
+      </button>
+    </div>
+
+    <!-- Master Action Buttons -->
+    <div class="flex items-center gap-2">
+      <!-- 🚀 LIVE DEMO BUTTON -->
+      <button onclick="toggleLiveDemoMode()" id="btn-live-demo" class="px-3 py-1.5 rounded-xl font-bold font-mono text-xs text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-500/25 border border-cyan-400/40 flex items-center gap-1.5 transition-all transform hover:scale-105">
+        <span class="text-sm">🚀</span> LIVE DEMO
+      </button>
+
+      <!-- 🎤 PRESENTATION MODE BUTTON -->
+      <button onclick="startSIHPresentationTour()" id="btn-presentation-mode" class="px-3 py-1.5 rounded-xl font-bold font-mono text-xs text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-500/25 border border-purple-400/40 flex items-center gap-1.5 transition-all transform hover:scale-105">
+        <i data-lucide="presentation" class="w-3.5 h-3.5"></i> PRESENTATION MODE
+      </button>
+
+      <!-- 🚨 EMERGENCY MODE (BIG RED BUTTON) -->
+      <button onclick="toggleEmergencyMode()" id="btn-emergency-mode" class="px-3.5 py-1.5 rounded-xl font-extrabold font-mono text-xs text-white bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 shadow-xl shadow-red-600/30 border border-red-400/60 flex items-center gap-1.5 transition-all transform hover:scale-105">
+        <span class="text-sm animate-bounce">🚨</span> EMERGENCY MODE
+      </button>
+
+      <!-- Audio Mute / Unmute -->
+      <button onclick="toggleAudio()" id="btn-audio-header" class="p-2 rounded-xl glass-card text-slate-300 hover:text-white border border-slate-700/60 transition-all" title="Toggle Sound">
+        <i data-lucide="volume-2" id="icon-audio" class="w-4 h-4 text-cyan-400"></i>
+      </button>
+
+      <!-- Reset Camera -->
+      <button onclick="setCameraPreset('campus')" class="p-2 rounded-xl glass-card text-slate-300 hover:text-cyan-400 border border-slate-700/60 transition-all" title="Reset Camera">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- FLOATING SIDEBAR EDGE TOGGLES (When Collapsed)                            -->
+  <!-- ========================================================================= -->
+  <!-- Left Edge Tab -->
+  <button onclick="toggleLeftPanel()" id="btn-tab-left" class="fixed top-20 left-4 z-20 px-3 py-1.5 rounded-xl glass-panel text-xs font-mono font-bold text-cyan-300 hover:text-white flex items-center gap-2 border border-cyan-500/30 shadow-xl transition-all hover:scale-105">
+    <i data-lucide="sliders" class="w-3.5 h-3.5 text-cyan-400"></i>
+    <span id="lbl-tab-left">Controls</span>
+    <i data-lucide="chevron-right" id="icon-tab-left" class="w-3.5 h-3.5 text-cyan-400 transition-transform"></i>
+  </button>
+
+  <!-- Right Edge Tab -->
+  <button onclick="toggleRightPanel()" id="btn-tab-right" class="fixed top-20 right-4 z-20 px-3 py-1.5 rounded-xl glass-panel text-xs font-mono font-bold text-cyan-300 hover:text-white flex items-center gap-2 border border-cyan-500/30 shadow-xl transition-all hover:scale-105">
+    <i data-lucide="chevron-left" id="icon-tab-right" class="w-3.5 h-3.5 text-cyan-400 transition-transform"></i>
+    <span id="lbl-tab-right">Telemetry</span>
+    <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
+  </button>
+
+  <!-- ========================================================================= -->
+  <!-- 1. LEFT COLLAPSIBLE PANEL (ALL EXISTING CONTROLS FULLY PRESERVED)          -->
+  <!-- ========================================================================= -->
+  <aside id="panel-left" class="fixed top-32 left-4 bottom-20 w-76 glass-panel rounded-2xl p-4 z-20 flex flex-col gap-3.5 overflow-y-auto panel-transition shadow-2xl border border-cyan-500/30">
+    <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
+      <div class="flex items-center gap-2 font-mono font-bold text-xs text-cyan-300 uppercase">
+        <i data-lucide="sliders" class="w-4 h-4 text-cyan-400"></i> Control & Simulation Center
+      </div>
+      <button onclick="toggleLeftPanel(false)" class="p-1 rounded-lg text-slate-400 hover:text-white" title="Collapse Panel">
+        <i data-lucide="minimize-2" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+
+    <!-- Multi-Floor Vertical Explode Slider (PRESERVED) -->
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="layers" class="w-3.5 h-3.5 text-cyan-400"></i> Floor Explode / Isolate
+        </span>
+        <span id="explode-val" class="text-xs font-mono text-cyan-400 font-bold">0.0x</span>
+      </div>
+      <input type="range" id="explode-slider" min="0" max="1" step="0.01" value="0" oninput="onExplodeChange(this.value)"
+        class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+      <div class="flex justify-between text-[10px] font-mono text-slate-400 mt-1">
+        <span>Stacked 3D</span>
+        <span>Expanded Cutaway</span>
+      </div>
+    </div>
+
+    <!-- Room Fast Focus Buttons (PRESERVED) -->
+    <div>
+      <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
+        <i data-lucide="crosshair" class="w-3.5 h-3.5 text-cyan-400"></i> Fast Room Focus
+      </span>
+      <div class="grid grid-cols-2 gap-1.5 text-xs">
+        <button onclick="focusRoom('control-room')" class="px-2 py-1.5 rounded-lg glass-card hover:border-cyan-500/50 text-left text-slate-200 transition-all flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> Control Room
+        </button>
+        <button onclick="focusRoom('class-g03')" class="px-2 py-1.5 rounded-lg glass-card hover:border-amber-500/50 text-left text-slate-200 transition-all flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Class G-03
+        </button>
+        <button onclick="focusRoom('lab')" class="px-2 py-1.5 rounded-lg glass-card hover:border-red-500/50 text-left text-slate-200 transition-all flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> Comp Lab
+        </button>
+        <button onclick="focusRoom('water-room')" class="px-2 py-1.5 rounded-lg glass-card hover:border-blue-500/50 text-left text-slate-200 transition-all flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> Water Pump
+        </button>
+        <button onclick="focusRoom('seminar-hall')" class="px-2 py-1.5 rounded-lg glass-card hover:border-purple-500/50 text-left text-slate-200 transition-all flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span> Seminar Hall
+        </button>
+        <button onclick="focusRoom('entrance')" class="px-2 py-1.5 rounded-lg glass-card hover:border-emerald-500/50 text-left text-slate-200 transition-all flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Main Gate
+        </button>
+      </div>
+    </div>
+
+    <!-- Visual Overlays Toggles (PRESERVED & EXPANDED) -->
+    <div>
+      <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 block mb-2">Display Overlays</span>
+      <div class="space-y-1.5 text-xs">
+        <label class="flex items-center justify-between p-2 rounded-lg glass-card cursor-pointer hover:bg-slate-800/60">
+          <span class="flex items-center gap-2 text-slate-300">
+            <i data-lucide="palette" class="w-3.5 h-3.5 text-amber-400"></i> Dynamic Heatmap
+          </span>
+          <input type="checkbox" id="chk-heatmap" checked onchange="toggleHeatmapVisuals(this.checked)" class="accent-amber-400 rounded">
+        </label>
+        <label class="flex items-center justify-between p-2 rounded-lg glass-card cursor-pointer hover:bg-slate-800/60">
+          <span class="flex items-center gap-2 text-slate-300">
+            <i data-lucide="wifi" class="w-3.5 h-3.5 text-cyan-400"></i> IoT Wi-Fi Data Packets
+          </span>
+          <input type="checkbox" id="chk-network" checked onchange="toggleNetworkVisuals(this.checked)" class="accent-cyan-400 rounded">
+        </label>
+        <label class="flex items-center justify-between p-2 rounded-lg glass-card cursor-pointer hover:bg-slate-800/60">
+          <span class="flex items-center gap-2 text-slate-300">
+            <i data-lucide="tag" class="w-3.5 h-3.5 text-emerald-400"></i> 3D Sensor Badges
+          </span>
+          <input type="checkbox" id="chk-pins" checked onchange="togglePinsVisuals(this.checked)" class="accent-emerald-400 rounded">
+        </label>
+        <label class="flex items-center justify-between p-2 rounded-lg glass-card cursor-pointer hover:bg-slate-800/60">
+          <span class="flex items-center gap-2 text-slate-300">
+            <i data-lucide="corner-down-right" class="w-3.5 h-3.5 text-emerald-400"></i> Evacuation Route Guide
+          </span>
+          <input type="checkbox" id="chk-evac" checked onchange="toggleEvacRoute(this.checked)" class="accent-emerald-400 rounded">
+        </label>
+        <label class="flex items-center justify-between p-2 rounded-lg glass-card cursor-pointer hover:bg-slate-800/60">
+          <span class="flex items-center gap-2 text-slate-300">
+            <i data-lucide="box" class="w-3.5 h-3.5 text-blue-400"></i> Cutaway Glass Transparency
+          </span>
+          <input type="checkbox" id="chk-xray" checked onchange="toggleXRayMode(this.checked)" class="accent-blue-400 rounded">
+        </label>
+      </div>
+    </div>
+
+    <!-- LIVE INCIDENT SIMULATOR (PRESERVED WITH ALL 7 DRILLS) -->
+    <div class="border-t border-slate-700/60 pt-3">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-mono font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+          <i data-lucide="flame" class="w-4 h-4"></i> Live Incident Simulator
+        </span>
+        <span class="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">SIH DRILLS</span>
+      </div>
+      <div class="space-y-1.5 text-xs font-mono">
+        <button onclick="triggerDrill('normal')" id="btn-scen-normal" class="w-full py-2 px-3 rounded-lg text-left bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center justify-between transition-all">
+          <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Normal Equilibrium</span>
+          <span class="text-[10px] opacity-75">All Clear</span>
+        </button>
+
+        <button onclick="triggerDrill('fire')" id="btn-scen-fire" class="w-full py-2 px-3 rounded-lg text-left bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-between transition-all">
+          <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> 1F Lab Fire & Smoke</span>
+          <span class="text-[10px] font-bold text-rose-400">FLAME / MQ2</span>
+        </button>
+
+        <button onclick="triggerDrill('gas')" id="btn-scen-gas" class="w-full py-2 px-3 rounded-lg text-left bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-between transition-all">
+          <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Toxic Gas Leakage</span>
+          <span class="text-[10px] font-bold text-amber-400">MQ2 680 PPM</span>
+        </button>
+
+        <button onclick="triggerDrill('water')" id="btn-scen-water" class="w-full py-2 px-3 rounded-lg text-left bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center justify-between transition-all">
+          <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span> Water Leak & Solenoid</span>
+          <span class="text-[10px] font-bold text-blue-400">AUTO SHUTOFF</span>
+        </button>
+
+        <button onclick="triggerDrill('absence')" id="btn-scen-absence" class="w-full py-2 px-3 rounded-lg text-left bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 flex items-center justify-between transition-all">
+          <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-yellow-400"></span> Faculty Absent Anomaly</span>
+          <span class="text-[10px] font-bold text-yellow-400">CLASS G-03</span>
+        </button>
+
+        <button onclick="triggerDrill('fight')" id="btn-scen-fight" class="w-full py-2 px-3 rounded-lg text-left bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center justify-between transition-all">
+          <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-purple-400"></span> AI Fight Detection</span>
+          <span class="text-[10px] font-bold text-purple-400">CCTV YOLO</span>
+        </button>
+
+        <button onclick="triggerDrill('smoke')" id="btn-scen-smoke" class="w-full py-2 px-3 rounded-lg text-left bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-between transition-all">
+          <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-400"></span> AI Smoking Detection</span>
+          <span class="text-[10px] font-bold text-amber-400">STAIRWELL 2F</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ========================================================================= -->
+  <!-- 2. RIGHT COLLAPSIBLE PANEL (ALL EXISTING TELEMETRY & ALERTS PRESERVED)     -->
+  <!-- ========================================================================= -->
+  <aside id="panel-right" class="fixed top-32 right-4 bottom-20 w-84 glass-panel rounded-2xl p-4 z-20 flex flex-col gap-3.5 overflow-y-auto panel-transition shadow-2xl border border-cyan-500/30">
+    <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
+      <div class="flex items-center gap-2 font-mono font-bold text-xs text-cyan-300 uppercase">
+        <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i> Real-Time Telemetry & Alerts
+      </div>
+      <button onclick="toggleRightPanel(false)" class="p-1 rounded-lg text-slate-400 hover:text-white" title="Collapse Panel">
+        <i data-lucide="minimize-2" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+
+    <!-- Active Banner Notification (PRESERVED) -->
+    <div id="alert-banner-container">
+      <div id="alert-banner" class="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-start gap-3">
+        <div class="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+          <i data-lucide="shield-check" class="w-5 h-5"></i>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold font-mono text-emerald-300">CAMPUS SECURE</span>
+            <span class="text-[10px] font-mono text-slate-400">NORMAL</span>
+          </div>
+          <p class="text-[11px] text-slate-300 mt-0.5">All 18 sensor zones operating within safe baseline thresholds.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Classroom Presence & Attendance Matrix (PRESERVED) -->
+    <div class="glass-card rounded-xl p-3 border border-slate-700/60">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="users" class="w-4 h-4 text-cyan-400"></i> Classroom Status Matrix
+        </span>
+        <span class="text-[10px] font-mono text-cyan-400">PIR + RFID</span>
+      </div>
+
+      <div class="space-y-2 text-xs font-mono">
+        <!-- Room G-01 -->
+        <div class="p-2 rounded bg-slate-900/70 border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="font-semibold text-slate-200">Room G-01</span>
+              <span class="text-[10px] text-slate-400">(Physics)</span>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Prof. Sharma (Present)</div>
+          </div>
+          <div class="text-right">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300">42 / 45</span>
+            <div class="text-[10px] text-slate-400 mt-0.5">23.6°C | 52%</div>
+          </div>
+        </div>
+
+        <!-- Room G-02 (Empty) -->
+        <div class="p-2 rounded bg-slate-900/70 border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span class="font-semibold text-slate-400">Room G-02</span>
+              <span class="text-[10px] text-slate-500">(Eco Mode)</span>
+            </div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Motion: None | HVAC Off</div>
+          </div>
+          <div class="text-right">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">0 / 45</span>
+            <div class="text-[10px] text-slate-500 mt-0.5">21.8°C | 48%</div>
+          </div>
+        </div>
+
+        <!-- Room G-03 (Faculty Absent Alert) -->
+        <div id="card-class-g03" class="p-2 rounded bg-amber-500/10 border border-amber-500/40 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+              <span class="font-semibold text-amber-200">Room G-03</span>
+              <span class="text-[10px] text-amber-400 font-bold">(ABSENT)</span>
+            </div>
+            <div class="text-[10px] text-amber-300 mt-0.5">Lecturer Missing &gt;15m</div>
+          </div>
+          <div class="text-right">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 font-bold">28 / 40</span>
+            <div class="text-[10px] text-amber-400 mt-0.5">ALERT SENT</div>
+          </div>
+        </div>
+
+        <!-- Comp Lab 1F -->
+        <div id="card-lab-status" class="p-2 rounded bg-slate-900/70 border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span id="lab-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="font-semibold text-slate-200">Comp Lab (1F)</span>
+            </div>
+            <div id="lab-hazard-label" class="text-[10px] text-slate-400 mt-0.5">Flame: SAFE | Smoke: OK</div>
+          </div>
+          <div class="text-right">
+            <span id="lab-smoke-ppm" class="px-2 py-0.5 rounded text-[10px] bg-cyan-500/20 text-cyan-300">48 PPM</span>
+            <div id="lab-temp-val" class="text-[10px] text-slate-400 mt-0.5">24.2°C | 50%</div>
+          </div>
+        </div>
+
+        <!-- Water Area GF -->
+        <div class="p-2 rounded bg-slate-900/70 border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+              <span class="font-semibold text-slate-200">Water Area (GF)</span>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Solenoid Manifold</div>
+          </div>
+          <div class="text-right">
+            <span id="val-solenoid-badge" class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-bold">VALVE OPEN</span>
+            <div id="val-press-sub" class="text-[10px] text-slate-400 mt-0.5">3.8 BAR Normal</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Environmental & Safety Telemetry Gauges (PRESERVED) -->
+    <div class="glass-card rounded-xl p-3 border border-slate-700/60">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="gauge" class="w-4 h-4 text-cyan-400"></i> Environmental Safety Gauges
+        </span>
+        <span class="text-[10px] font-mono text-slate-400">DHT22 & MQ2</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+        <!-- Gas MQ2 -->
+        <div class="p-2 rounded bg-slate-900/70 border border-slate-800">
+          <span class="text-slate-400 text-[11px] block">MQ-2 Gas / Smoke</span>
+          <div class="text-base font-bold text-cyan-300 mt-1"><span id="val-mq2">48</span> <span class="text-[10px] text-slate-400 font-normal">PPM</span></div>
+          <div class="w-full bg-slate-800 rounded-full h-1 mt-2">
+            <div id="bar-mq2" class="bg-cyan-400 h-1 rounded-full" style="width: 12%"></div>
+          </div>
+        </div>
+
+        <!-- Water Pressure -->
+        <div class="p-2 rounded bg-slate-900/70 border border-slate-800">
+          <span class="text-slate-400 text-[11px] block">Pipeline Pressure</span>
+          <div class="text-base font-bold text-blue-300 mt-1"><span id="val-water-press">3.8</span> <span class="text-[10px] text-slate-400 font-normal">BAR</span></div>
+          <div class="text-[10px] text-slate-400 mt-1.5 flex justify-between">
+            <span>Solenoid:</span>
+            <span id="val-solenoid" class="text-emerald-400 font-bold">OPEN</span>
+          </div>
+        </div>
+
+        <!-- Electrical Power -->
+        <div class="p-2 rounded bg-slate-900/70 border border-slate-800">
+          <span class="text-slate-400 text-[11px] block">Grid Power Draw</span>
+          <div class="text-base font-bold text-amber-300 mt-1">42.6 <span class="text-[10px] text-slate-400 font-normal">kW</span></div>
+          <div class="w-full bg-slate-800 rounded-full h-1 mt-2">
+            <div class="bg-amber-400 h-1 rounded-full" style="width: 48%"></div>
+          </div>
+        </div>
+
+        <!-- ESP32 Mesh Health -->
+        <div class="p-2 rounded bg-slate-900/70 border border-slate-800">
+          <span class="text-slate-400 text-[11px] block">Mesh RTT Latency</span>
+          <div class="text-base font-bold text-emerald-400 mt-1">14 <span class="text-[10px] text-slate-400 font-normal">ms</span></div>
+          <div class="text-[10px] text-emerald-400 mt-1">RSSI: -58 dBm</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Acoustic Surveillance & Audio Intelligence Module (NEW) -->
+    <div class="glass-card rounded-xl p-3 border border-purple-500/30 bg-purple-950/15">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-mono font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+          <i data-lucide="mic" class="w-4 h-4 text-purple-400"></i> Acoustic Surveillance
+        </span>
+        <span id="badge-audio-status" class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">CALM: 42 dB</span>
+      </div>
+
+      <!-- Live Waveform VU Visualizer -->
+      <div class="bg-slate-950/80 rounded-lg p-2 border border-slate-800 flex items-center gap-2 mb-2">
+        <div class="flex-1">
+          <div class="flex justify-between text-[10px] font-mono text-slate-400 mb-1">
+            <span>MIC SPECTRUM (30 - 110 dB)</span>
+            <span id="txt-audio-db" class="text-cyan-400 font-bold">42 dB</span>
+          </div>
+          <!-- Canvas Audio Visualizer -->
+          <canvas id="audio-vu-canvas" width="260" height="26" class="w-full h-6 rounded bg-slate-900"></canvas>
+        </div>
+      </div>
+
+      <!-- 4-Zone Acoustic Telemetry Matrix -->
+      <div class="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
+        <div id="audio-zone-g01" class="p-1.5 rounded bg-slate-900/60 border border-slate-800 flex flex-col">
+          <span class="text-slate-400">G-01 Classroom</span>
+          <span class="text-cyan-400 font-bold mt-0.5" id="db-g01">58 dB [Lecture]</span>
+        </div>
+        <div id="audio-zone-g03" class="p-1.5 rounded bg-amber-500/10 border border-amber-500/30 flex flex-col">
+          <span class="text-slate-400">G-03 Classroom</span>
+          <span class="text-amber-400 font-bold mt-0.5" id="db-g03">36 dB [Silent]</span>
+        </div>
+        <div id="audio-zone-corridor" class="p-1.5 rounded bg-slate-900/60 border border-slate-800 flex flex-col">
+          <span class="text-slate-400">1F North Corridor</span>
+          <span class="text-emerald-400 font-bold mt-0.5" id="db-corridor">42 dB [Normal]</span>
+        </div>
+        <div id="audio-zone-stairwell" class="p-1.5 rounded bg-slate-900/60 border border-slate-800 flex flex-col">
+          <span class="text-slate-400">2F Stairwell</span>
+          <span class="text-emerald-400 font-bold mt-0.5" id="db-stairwell">28 dB [Quiet]</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Event Log Stream (PRESERVED) -->
+    <div class="glass-card rounded-xl p-3 border border-slate-700/60 flex-1 flex flex-col">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="terminal" class="w-4 h-4 text-cyan-400"></i> Live Security Log Stream
+        </span>
+        <button onclick="clearEventLogs()" class="text-[10px] text-slate-400 hover:text-slate-200">Clear</button>
+      </div>
+      <div id="event-log-container" class="space-y-1.5 text-[11px] font-mono max-h-36 overflow-y-auto pr-1">
+        <div class="text-slate-400"><span class="text-cyan-400">[19:00:12]</span> ESP32-Mesh: Node G01-G03 telemetry synced.</div>
+        <div class="text-slate-400"><span class="text-cyan-400">[19:02:44]</span> Water flow nominal at 18.2 L/min.</div>
+        <div class="text-amber-300"><span class="text-cyan-400">[19:03:00]</span> [ALERT] Room G-03: Faculty absent &gt; 15 mins.</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ========================================================================= -->
+  <!-- BOTTOM FLOATING DOCK: CAMERA PRESETS & SENSOR VISUALIZATION               -->
+  <!-- ========================================================================= -->
+  <footer class="fixed bottom-4 left-1/2 -translate-x-1/2 glass-panel rounded-2xl px-5 py-2.5 z-20 flex items-center gap-5 shadow-2xl border border-cyan-500/25">
+    <!-- Camera View Presets (PRECISELY MATCHING REQUIREMENT) -->
+    <div class="flex items-center gap-1.5">
+      <span class="text-xs font-mono font-bold text-slate-400 uppercase hidden sm:block mr-1">Camera:</span>
+      <button onclick="setCameraPreset('campus')" id="cam-campus" class="px-2.5 py-1 text-xs font-mono font-bold rounded-lg bg-cyan-600 text-white shadow transition-all flex items-center gap-1.5">
+        <span>🏫</span> Campus View
+      </button>
+      <button onclick="setCameraPreset('classroom')" id="cam-classroom" class="px-2.5 py-1 text-xs font-mono rounded-lg glass-card text-slate-300 hover:text-white transition-all flex items-center gap-1.5">
+        <span>🏢</span> Classroom View
+      </button>
+      <button onclick="setCameraPreset('security')" id="cam-security" class="px-2.5 py-1 text-xs font-mono rounded-lg glass-card text-slate-300 hover:text-white transition-all flex items-center gap-1.5">
+        <span>🛡</span> Security Room
+      </button>
+      <button onclick="setCameraPreset('firezone')" id="cam-firezone" class="px-2.5 py-1 text-xs font-mono rounded-lg glass-card text-slate-300 hover:text-white transition-all flex items-center gap-1.5">
+        <span>🔥</span> Fire Zone
+      </button>
+      <button onclick="setCameraPreset('sensor')" id="cam-sensor" class="px-2.5 py-1 text-xs font-mono rounded-lg glass-card text-slate-300 hover:text-white transition-all flex items-center gap-1.5">
+        <span>📡</span> Sensor View
+      </button>
+    </div>
+
+    <div class="h-5 w-px bg-slate-700/80"></div>
+
+    <!-- Visible Sensor Badges (PRECISELY MATCHING REQUIREMENT) -->
+    <div class="hidden md:flex items-center gap-3 text-xs font-mono text-slate-300">
+      <span class="flex items-center gap-1" title="CCTV Cameras"><span class="w-2 h-2 rounded-full bg-cyan-400"></span> 📹 CCTV</span>
+      <span class="flex items-center gap-1" title="Flame Sensors"><span class="w-2 h-2 rounded-full bg-rose-500"></span> 🔥 Flame</span>
+      <span class="flex items-center gap-1" title="MQ2 Gas Sensors"><span class="w-2 h-2 rounded-full bg-amber-400"></span> ☁ MQ2 Gas</span>
+      <span class="flex items-center gap-1" title="Water Sensors"><span class="w-2 h-2 rounded-full bg-blue-500"></span> 💧 Water</span>
+      <span class="flex items-center gap-1" title="Temperature Sensors"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> 🌡 DHT22</span>
+      <span class="flex items-center gap-1" title="PIR Occupancy Sensors"><span class="w-2 h-2 rounded-full bg-purple-400"></span> 👤 PIR</span>
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- PRESENTATION MODE AUTO-GUIDED TOUR OVERLAY                                 -->
+  <!-- ========================================================================= -->
+  <div id="tour-overlay" class="fixed top-20 left-1/2 -translate-x-1/2 glass-panel rounded-2xl px-6 py-4 z-40 hidden border border-purple-400/50 shadow-2xl flex-col items-center max-w-xl text-center">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="w-2.5 h-2.5 rounded-full bg-purple-400 animate-ping"></span>
+      <span class="text-xs font-mono font-bold text-purple-300 uppercase">SIH Presentation Mode — Autonomous Demonstration</span>
+      <span id="tour-step-badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-400/30">Step 1 / 9</span>
+    </div>
+    <h3 id="tour-step-title" class="text-base font-bold text-white mt-1">1. Classroom Occupancy & Climate Monitoring</h3>
+    <p id="tour-step-desc" class="text-xs text-slate-300 mt-1 leading-relaxed">
+      Observing Room G-01 with 42 verified students and Prof. Sharma. PIR motion confirms occupancy and DHT22 regulates HVAC.
+    </p>
+    <div class="flex items-center gap-3 mt-3">
+      <button onclick="nextTourStep()" class="px-4 py-1.5 rounded-xl text-xs font-bold font-mono bg-purple-600 hover:bg-purple-500 text-white shadow transition-all">Next Module →</button>
+      <button onclick="stopSIHPresentationTour()" class="px-3 py-1.5 rounded-xl text-xs font-mono glass-card text-slate-400 hover:text-white transition-all">Exit Tour</button>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- OVERLAY VIEW 1: AI CCTV VIDEO WALL (FULL ORIGINAL CAPABILITY)              -->
+  <!-- ========================================================================= -->
+  <div id="view-cctv-wall" class="fixed inset-0 top-16 bg-[#050813]/95 backdrop-blur-2xl z-25 p-8 hidden flex-col gap-5 overflow-y-auto">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div>
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="cctv" class="w-5 h-5 text-cyan-400"></i> AI Computer Vision Surveillance Stream
+        </h2>
+        <p class="text-xs text-slate-400">Edge YOLOv8 deep learning analyzing student fights, smoking, and attendance verification.</p>
+      </div>
+      <button onclick="switchViewMode('3d')" class="px-3.5 py-1.5 rounded-xl glass-panel text-xs font-mono text-cyan-300 hover:text-white border border-cyan-500/30">
+        Return to 3D Twin
+      </button>
+    </div>
+
+    <!-- 6-Split Camera Grid (PRESERVED) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 flex-1">
+      <!-- CAM 101: 1F Corridor Fight -->
+      <div class="glass-card rounded-2xl overflow-hidden border border-slate-800 flex flex-col">
+        <div class="p-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+          <span class="flex items-center gap-2 text-cyan-300 font-bold">
+            <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> CAM-101: 1F NORTH CORRIDOR
+          </span>
+          <span class="text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30">AI: VIOLENCE DETECTED (94.2%)</span>
+        </div>
+        <div class="relative bg-slate-950 flex-1 min-h-[200px] flex items-center justify-center overflow-hidden">
+          <canvas id="canvas-cam1" width="480" height="270" class="w-full h-full object-cover"></canvas>
+          <div class="absolute top-10 left-12 yolo-box px-2 py-1 rounded text-[10px] font-mono text-rose-300 font-bold">
+            STUDENT ALTERCATION #3 [94.2%]
+          </div>
+          <div class="absolute bottom-2 left-2 text-[10px] font-mono text-slate-400 bg-black/60 px-2 py-0.5 rounded">
+            FPS: 30.1 | YOLOv8-NANO-FIGHT | 22ms
+          </div>
+        </div>
+      </div>
+
+      <!-- CAM 204: 2F Stairwell Smoking -->
+      <div class="glass-card rounded-2xl overflow-hidden border border-slate-800 flex flex-col">
+        <div class="p-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+          <span class="flex items-center gap-2 text-cyan-300 font-bold">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> CAM-204: 2F STAIRCASE ATRIUM
+          </span>
+          <span class="text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">AI: SMOKING DETECTED (91.8%)</span>
+        </div>
+        <div class="relative bg-slate-950 flex-1 min-h-[200px] flex items-center justify-center overflow-hidden">
+          <canvas id="canvas-cam2" width="480" height="270" class="w-full h-full object-cover"></canvas>
+          <div class="absolute top-12 right-20 border-2 border-amber-400 bg-amber-500/15 px-2 py-1 rounded text-[10px] font-mono text-amber-300 font-bold">
+            CIGARETTE PLUME [91.8%]
+          </div>
+          <div class="absolute bottom-2 left-2 text-[10px] font-mono text-slate-400 bg-black/60 px-2 py-0.5 rounded">
+            FPS: 29.8 | YOLOv8-SMOKE | NON-SMOKING ZONE
+          </div>
+        </div>
+      </div>
+
+      <!-- CAM 003: Classroom G-03 Faculty Absent -->
+      <div class="glass-card rounded-2xl overflow-hidden border border-slate-800 flex flex-col">
+        <div class="p-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+          <span class="flex items-center gap-2 text-amber-300 font-bold">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> CAM-003: CLASSROOM G-03
+          </span>
+          <span class="text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">FACULTY ABSENT ALERT</span>
+        </div>
+        <div class="relative bg-slate-950 flex-1 min-h-[200px] flex items-center justify-center overflow-hidden">
+          <canvas id="canvas-cam3" width="480" height="270" class="w-full h-full object-cover"></canvas>
+          <div class="absolute bottom-8 left-8 border-2 border-emerald-400 bg-emerald-500/15 px-2 py-1 rounded text-[10px] font-mono text-emerald-300 font-bold">
+            STUDENTS: 28 VERIFIED
+          </div>
+          <div class="absolute top-6 right-8 border-2 border-amber-500 bg-amber-500/20 px-2 py-1 rounded text-[10px] font-mono text-amber-300 font-bold animate-pulse">
+            LECTURN: VACANT &gt; 15m
+          </div>
+        </div>
+      </div>
+
+      <!-- CAM 001: Main Entrance Turnstiles -->
+      <div class="glass-card rounded-2xl overflow-hidden border border-slate-800 flex flex-col">
+        <div class="p-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+          <span class="flex items-center gap-2 text-cyan-300 font-bold">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> CAM-001: MAIN ENTRANCE TURNSTILES
+          </span>
+          <span class="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">ACCESS GRANTED</span>
+        </div>
+        <div class="relative bg-slate-950 flex-1 min-h-[200px] flex items-center justify-center overflow-hidden">
+          <canvas id="canvas-cam4" width="480" height="270" class="w-full h-full object-cover"></canvas>
+        </div>
+      </div>
+
+      <!-- CAM 105: 1F Computer Lab Fire -->
+      <div class="glass-card rounded-2xl overflow-hidden border border-slate-800 flex flex-col">
+        <div class="p-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+          <span class="flex items-center gap-2 text-rose-300 font-bold">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> CAM-105: 1F ROBOTICS LAB
+          </span>
+          <span class="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">MONITORING</span>
+        </div>
+        <div class="relative bg-slate-950 flex-1 min-h-[200px] flex items-center justify-center overflow-hidden">
+          <canvas id="canvas-cam5" width="480" height="270" class="w-full h-full object-cover"></canvas>
+        </div>
+      </div>
+
+      <!-- CAM 006: Water Pump Manifold -->
+      <div class="glass-card rounded-2xl overflow-hidden border border-slate-800 flex flex-col">
+        <div class="p-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+          <span class="flex items-center gap-2 text-blue-300 font-bold">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> CAM-006: UTILITY PIPELINE
+          </span>
+          <span class="text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded">3.8 BAR STABLE</span>
+        </div>
+        <div class="relative bg-slate-950 flex-1 min-h-[200px] flex items-center justify-center overflow-hidden">
+          <canvas id="canvas-cam6" width="480" height="270" class="w-full h-full object-cover"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- OVERLAY VIEW 2: IOT SENSOR NETWORK MATRIX (FULL ORIGINAL CAPABILITY)      -->
+  <!-- ========================================================================= -->
+  <div id="view-sensors-grid" class="fixed inset-0 top-16 bg-[#050813]/95 backdrop-blur-2xl z-25 p-8 hidden flex-col gap-5 overflow-y-auto">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div>
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="cpu" class="w-5 h-5 text-cyan-400"></i> ESP32 Sensor Nodes & Network Health Topology
+        </h2>
+        <p class="text-xs text-slate-400">Status of 18 edge microcontrollers broadcasting over encrypted ESP-NOW Wi-Fi mesh.</p>
+      </div>
+      <button onclick="switchViewMode('3d')" class="px-3.5 py-1.5 rounded-xl glass-panel text-xs font-mono text-cyan-300 hover:text-white border border-cyan-500/30">
+        Return to 3D Twin
+      </button>
+    </div>
+
+    <!-- 8 Sensor Node Cards (PRESERVED) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="glass-card rounded-xl p-4 border border-slate-800 font-mono text-xs">
+        <div class="flex justify-between mb-2"><span class="text-cyan-300 font-bold">NODE-GF-01 (Gate)</span><span class="text-emerald-400">ONLINE</span></div>
+        <div class="text-[11px] text-slate-400 space-y-1"><div>RC522 RFID, IR Breakbeam</div><div>192.168.1.101 | RSSI: -48 dBm</div><div>Uptime: 48h 12m</div></div>
+      </div>
+      <div class="glass-card rounded-xl p-4 border border-slate-800 font-mono text-xs">
+        <div class="flex justify-between mb-2"><span class="text-cyan-300 font-bold">NODE-GF-02 (Sec. Room)</span><span class="text-emerald-400">BROKER</span></div>
+        <div class="text-[11px] text-slate-400 space-y-1"><div>Central Gateway Server</div><div>MQTT Port: 1883 | 2ms RTT</div><div>Free RAM: 184 KB</div></div>
+      </div>
+      <div class="glass-card rounded-xl p-4 border border-slate-800 font-mono text-xs">
+        <div class="flex justify-between mb-2"><span class="text-cyan-300 font-bold">NODE-GF-03 (Class G01)</span><span class="text-emerald-400">ONLINE</span></div>
+        <div class="text-[11px] text-slate-400 space-y-1"><div>DHT22, HC-SR501 PIR</div><div>23.6°C | 52% | Occ=42</div><div>Relay: HVAC ON</div></div>
+      </div>
+      <div class="glass-card rounded-xl p-4 border border-amber-500/40 bg-amber-500/10 font-mono text-xs">
+        <div class="flex justify-between mb-2"><span class="text-amber-300 font-bold">NODE-GF-05 (Class G03)</span><span class="text-amber-400 animate-pulse">ALERT</span></div>
+        <div class="text-[11px] text-amber-200/90 space-y-1"><div>Faculty Missing &gt; 15m</div><div>Students: 28 flagged</div><div>Timetable Mismatch</div></div>
+      </div>
+      <div class="glass-card rounded-xl p-4 border border-slate-800 font-mono text-xs">
+        <div class="flex justify-between mb-2"><span class="text-cyan-300 font-bold">NODE-GF-06 (Water Area)</span><span class="text-blue-400">ARMED</span></div>
+        <div class="text-[11px] text-slate-400 space-y-1"><div>Floor Liquid Sensor</div><div>12V Brass Solenoid Valve</div><div>Supply Pressure: 3.8 BAR</div></div>
+      </div>
+      <div class="glass-card rounded-xl p-4 border border-slate-800 font-mono text-xs">
+        <div class="flex justify-between mb-2"><span class="text-cyan-300 font-bold">NODE-1F-02 (Comp Lab)</span><span class="text-emerald-400">ONLINE</span></div>
+        <div class="text-[11px] text-slate-400 space-y-1"><div>MQ-2 Gas, IR Optical Flame</div><div>85dB Buzzer & Strobe LED</div><div>Current Gas: 48 PPM</div></div>
+      </div>
+      <div class="glass-card rounded-xl p-4 border border-slate-800 font-mono text-xs">
+        <div class="flex justify-between mb-2"><span class="text-cyan-300 font-bold">NODE-2F-01 (Seminar)</span><span class="text-emerald-400">ONLINE</span></div>
+        <div class="text-[11px] text-slate-400 space-y-1"><div>DHT22, CO2 NDIR, PIR</div><div>Smart Projector Interlock</div><div>Decibel: 42 dB</div></div>
+      </div>
+      <div class="glass-card rounded-xl p-4 border border-slate-800 font-mono text-xs">
+        <div class="flex justify-between mb-2"><span class="text-cyan-300 font-bold">NODE-2F-04 (Admin)</span><span class="text-emerald-400">ONLINE</span></div>
+        <div class="text-[11px] text-slate-400 space-y-1"><div>Fingerprint Biometric, PIR</div><div>Vault Magnetic Interlock</div><div>6 Authorizations Today</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- OVERLAY VIEW 3: AI ANALYTICS DASHBOARD (FULL ORIGINAL CAPABILITY)         -->
+  <!-- ========================================================================= -->
+  <div id="view-analytics-dash" class="fixed inset-0 top-16 bg-[#050813]/95 backdrop-blur-2xl z-25 p-8 hidden flex-col gap-6 overflow-y-auto">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div>
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="bar-chart-3" class="w-5 h-5 text-cyan-400"></i> Smart Campus AI Analytics & Safety Scorecard
+        </h2>
+        <p class="text-xs text-slate-400">Deep telemetry trends, environmental risk assessment, and autonomous security scores.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800">
+          <div class="text-right font-mono">
+            <span class="text-[10px] text-slate-400 block">CAMPUS SAFETY SCORE</span>
+            <span id="stat-safety-score" class="text-xl font-bold text-emerald-400">98.4 / 100</span>
+          </div>
+          <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">A+</div>
+        </div>
+        <button onclick="switchViewMode('3d')" class="px-3.5 py-1.5 rounded-xl glass-panel text-xs font-mono text-cyan-300 hover:text-white border border-cyan-500/30">
+          Return to 3D Twin
+        </button>
+      </div>
+    </div>
+
+    <!-- 4 Chart Cards (PRESERVED) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col">
+        <h3 class="text-sm font-bold text-white font-mono flex items-center gap-2 mb-3">
+          <i data-lucide="users" class="w-4 h-4 text-cyan-400"></i> Classroom Occupancy Trends (Past 24 Hours)
+        </h3>
+        <div class="flex-1 min-h-[220px]"><canvas id="chart-occupancy"></canvas></div>
+      </div>
+      <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col">
+        <h3 class="text-sm font-bold text-white font-mono flex items-center gap-2 mb-3">
+          <i data-lucide="shield" class="w-4 h-4 text-emerald-400"></i> Multi-Hazard Campus Risk Index
+        </h3>
+        <div class="flex-1 min-h-[220px]"><canvas id="chart-risk"></canvas></div>
+      </div>
+      <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col">
+        <h3 class="text-sm font-bold text-white font-mono flex items-center gap-2 mb-3">
+          <i data-lucide="wind" class="w-4 h-4 text-amber-400"></i> Indoor Air Quality & Gas Exposure (MQ-2 PPM)
+        </h3>
+        <div class="flex-1 min-h-[220px]"><canvas id="chart-gas"></canvas></div>
+      </div>
+      <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col">
+        <h3 class="text-sm font-bold text-white font-mono flex items-center gap-2 mb-3">
+          <i data-lucide="cctv" class="w-4 h-4 text-purple-400"></i> AI Threat & Violation Incident Distribution
+        </h3>
+        <div class="flex-1 min-h-[220px]"><canvas id="chart-threats"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT: 3D THREE.JS DIGITAL TWIN, SIMULATION & AUDIO                  -->
+  <!-- ========================================================================= -->
+  <script>
+    lucide.createIcons();
+
+    // -------------------------------------------------------------------------
+    // WEB AUDIO API SOUND SYNTHESIZER
+    // -------------------------------------------------------------------------
+    let audioCtx = null;
+    let isAudioEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playBeep(freq = 880, type = 'sine', duration = 0.15) {
+      if (!isAudioEnabled) return;
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) { }
+    }
+
+    function playAlarmSiren() {
+      if (!isAudioEnabled) return;
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(550, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(1150, audioCtx.currentTime + 0.35);
+        osc.frequency.linearRampToValueAtTime(550, audioCtx.currentTime + 0.7);
+        gain.gain.setValueAtTime(0.14, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.7);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration || audioCtx.currentTime + 0.7);
+      } catch (e) { }
+    }
+
+    function toggleAudio() {
+      isAudioEnabled = !isAudioEnabled;
+      const icon = document.getElementById('icon-audio');
+      if (isAudioEnabled) {
+        icon.setAttribute('data-lucide', 'volume-2');
+        playBeep(900, 'sine', 0.1);
+      } else {
+        icon.setAttribute('data-lucide', 'volume-x');
+      }
+      lucide.createIcons();
+    }
+
+    function speakNarration(text) {
+      if (!('speechSynthesis' in window) || !isAudioEnabled) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.05;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+      } catch (e) { }
+    }
+
+    // -------------------------------------------------------------------------
+    // 1. COLLAPSIBLE SIDE PANELS CONTROLLER
+    // -------------------------------------------------------------------------
+    let isLeftPanelOpen = true;
+    let isRightPanelOpen = true;
+
+    function toggleLeftPanel(forceState) {
+      isLeftPanelOpen = forceState !== undefined ? forceState : !isLeftPanelOpen;
+      const panel = document.getElementById('panel-left');
+      const icon = document.getElementById('icon-tab-left');
+      const tab = document.getElementById('btn-tab-left');
+
+      if (isLeftPanelOpen) {
+        panel.style.transform = 'translateX(0)';
+        icon.style.transform = 'rotate(180deg)';
+        tab.classList.add('bg-cyan-500/20');
+      } else {
+        panel.style.transform = 'translateX(-120%)';
+        icon.style.transform = 'rotate(0deg)';
+        tab.classList.remove('bg-cyan-500/20');
+      }
+      playBeep(950, 'sine', 0.05);
+    }
+
+    function toggleRightPanel(forceState) {
+      isRightPanelOpen = forceState !== undefined ? forceState : !isRightPanelOpen;
+      const panel = document.getElementById('panel-right');
+      const icon = document.getElementById('icon-tab-right');
+      const tab = document.getElementById('btn-tab-right');
+
+      if (isRightPanelOpen) {
+        panel.style.transform = 'translateX(0)';
+        icon.style.transform = 'rotate(180deg)';
+        tab.classList.add('bg-cyan-500/20');
+      } else {
+        panel.style.transform = 'translateX(120%)';
+        icon.style.transform = 'rotate(0deg)';
+        tab.classList.remove('bg-cyan-500/20');
+      }
+      playBeep(950, 'sine', 0.05);
+    }
+
+    // -------------------------------------------------------------------------
+    // THREE.JS 3D ENVIRONMENT SETUP
+    // -------------------------------------------------------------------------
+    const container = document.getElementById('webgl-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x030712);
+    scene.fog = new THREE.FogExp2(0x030712, 0.008);
+
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.5, 1200);
+
+    // 4. CAMERA PRESETS
+    const cameraPresets = {
+      campus: { pos: new THREE.Vector3(70, 52, 75), target: new THREE.Vector3(0, 8, 0) },
+      classroom: { pos: new THREE.Vector3(14, 18, 24), target: new THREE.Vector3(1, 4, 10) },
+      security: { pos: new THREE.Vector3(-10, 14, 2), target: new THREE.Vector3(-18, 4, -14) },
+      firezone: { pos: new THREE.Vector3(34, 22, 12), target: new THREE.Vector3(20, 12, -10) },
+      sensor: { pos: new THREE.Vector3(0, 92, 25), target: new THREE.Vector3(0, 8, 0) }
+    };
+    camera.position.copy(cameraPresets.campus.pos);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2.05;
+    controls.minDistance = 10;
+    controls.maxDistance = 240;
+    controls.target.copy(cameraPresets.campus.target);
+
+    // -------------------------------------------------------------------------
+    // CINEMATIC LIGHTING
+    // -------------------------------------------------------------------------
+    let ambientLight = new THREE.AmbientLight(0xdbeafe, 0.7);
+    scene.add(ambientLight);
+
+    let sunLight = new THREE.DirectionalLight(0xfffaed, 1.4);
+    sunLight.position.set(65, 95, 55);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.bias = -0.0004;
+    scene.add(sunLight);
+
+    let emergencyRedLight = new THREE.PointLight(0xef4444, 0.0, 100);
+    emergencyRedLight.position.set(0, 15, 0);
+    scene.add(emergencyRedLight);
+
+    // -------------------------------------------------------------------------
+    // 8. CAMPUS ENVIRONMENT ENHANCEMENT (Roads, Greenery, Parking, Gate)
+    // -------------------------------------------------------------------------
+    const campusEnvGroup = new THREE.Group();
+    scene.add(campusEnvGroup);
+
+    // Ground Asphalt Platform
+    const groundGeo = new THREE.PlaneGeometry(240, 240);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x0a101d, roughness: 0.9 });
+    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.y = -0.1;
+    groundMesh.receiveShadow = true;
+    campusEnvGroup.add(groundMesh);
+
+    // Grid Overlay
+    const grid = new THREE.GridHelper(240, 80, 0x0284c7, 0x1e293b);
+    grid.position.y = 0.0;
+    campusEnvGroup.add(grid);
+
+    // Main Perimeter Road
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 });
+    const roadFront = new THREE.Mesh(new THREE.BoxGeometry(180, 0.2, 16), roadMat);
+    roadFront.position.set(0, 0.1, 42);
+    campusEnvGroup.add(roadFront);
+
+    // White Dashed Center Line
+    for (let x = -80; x <= 80; x += 10) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.22, 0.4), new THREE.MeshBasicMaterial({ color: 0xf8fafc }));
+      stripe.position.set(x, 0.12, 42);
+      campusEnvGroup.add(stripe);
+    }
+
+    // Parking Bay with 3D Cars
+    const parkingLot = new THREE.Mesh(new THREE.BoxGeometry(60, 0.2, 22), new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.7 }));
+    parkingLot.position.set(-60, 0.1, 15);
+    campusEnvGroup.add(parkingLot);
+
+    function createCar(x, z, colorHex = 0x0284c7, rotation = 0) {
+      const carGroup = new THREE.Group();
+      carGroup.position.set(x, 0.2, z);
+      carGroup.rotation.y = rotation;
+      const chassis = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.1, 2.2), new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.6, roughness: 0.3 }));
+      chassis.position.y = 0.8;
+      carGroup.add(chassis);
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.8, 1.8), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1 }));
+      cabin.position.set(-0.2, 1.7, 0);
+      carGroup.add(cabin);
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x020617, roughness: 0.9 });
+      [[-1.4, -1.0], [1.4, -1.0], [-1.4, 1.0], [1.4, 1.0]].forEach(([wx, wz]) => {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.3, 12), wheelMat);
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(wx, 0.4, wz);
+        carGroup.add(wheel);
+      });
+      campusEnvGroup.add(carGroup);
+    }
+    createCar(-72, 18, 0xef4444, Math.PI / 2);
+    createCar(-64, 18, 0x38bdf8, Math.PI / 2);
+    createCar(-56, 18, 0xf59e0b, Math.PI / 2);
+    createCar(-48, 18, 0x10b981, Math.PI / 2);
+
+    // Gate Cabin & Boom Barrier
+    const gateCabin = new THREE.Mesh(new THREE.BoxGeometry(4.0, 3.2, 3.6), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.3 }));
+    gateCabin.position.set(16, 1.6, 32);
+    campusEnvGroup.add(gateCabin);
+
+    const barrierPole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 7.5), new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 }));
+    barrierPole.rotation.z = Math.PI / 2;
+    barrierPole.position.set(8, 1.2, 32);
+    campusEnvGroup.add(barrierPole);
+
+    // Street Lamps
+    function createStreetLamp(x, z) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 9.0), new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 }));
+      pole.position.set(x, 4.5, z);
+      campusEnvGroup.add(pole);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 12), new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfef08a, emissiveIntensity: 1.0 }));
+      head.position.set(x, 9.0, z);
+      campusEnvGroup.add(head);
+    }
+    createStreetLamp(-42, 32); createStreetLamp(32, 32); createStreetLamp(52, 12); createStreetLamp(-52, -15);
+
+    // Trees
+    function createTree(x, z, scale = 1.0) {
+      const tree = new THREE.Group();
+      tree.position.set(x, 0, z);
+      tree.scale.set(scale, scale, scale);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 3.0), new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 }));
+      trunk.position.y = 1.5;
+      tree.add(trunk);
+      const foliageMat = new THREE.MeshStandardMaterial({ color: 0x059669, roughness: 0.6, flatShading: true });
+      [2.8, 4.2, 5.4].forEach((fy, idx) => {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(2.4 - idx * 0.6, 2.2, 7), foliageMat);
+        cone.position.y = fy;
+        tree.add(cone);
+      });
+      campusEnvGroup.add(tree);
+    }
+    createTree(-38, 26, 1.1); createTree(-45, 24, 0.9); createTree(28, 25, 1.2); createTree(36, 24, 1.0); createTree(44, -12, 1.3);
+
+    // -------------------------------------------------------------------------
+    // 3. 3-FLOOR DIGITAL TWIN CAMPUS BUILDING
+    // -------------------------------------------------------------------------
+    const floorGroups = {
+      gf: new THREE.Group(),
+      f1: new THREE.Group(),
+      f2: new THREE.Group()
+    };
+    scene.add(floorGroups.gf);
+    scene.add(floorGroups.f1);
+    scene.add(floorGroups.f2);
+
+    const FLOOR_HEIGHT = 8.5;
+    const FLOOR_Y_BASE = { gf: 0, f1: FLOOR_HEIGHT, f2: FLOOR_HEIGHT * 2 };
+
+    floorGroups.gf.position.y = FLOOR_Y_BASE.gf;
+    floorGroups.f1.position.y = FLOOR_Y_BASE.f1;
+    floorGroups.f2.position.y = FLOOR_Y_BASE.f2;
+
+    const floorSlabMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+    const wallSolidMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+    const wallPartitionMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 });
+    const glassFacadeMat = new THREE.MeshPhysicalMaterial({
+      color: 0x93c5fd,
+      transparent: true,
+      opacity: 0.18,
+      roughness: 0.1,
+      transmission: 0.88,
+      depthWrite: false
+    });
+
+    // 7. DIGITAL TWIN DYNAMIC HEATMAP PLANES
+    const heatmapMeshes = {};
+
+    function createRoomHeatmapPlane(parentGroup, key, w, d, x, z) {
+      const geo = new THREE.PlaneGeometry(w - 0.4, d - 0.4);
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x10b981,
+        emissive: 0x10b981,
+        emissiveIntensity: 0.2,
+        transparent: true,
+        opacity: 0.45,
+        roughness: 0.3
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(x, 0.42, z);
+      parentGroup.add(mesh);
+      heatmapMeshes[key] = mesh;
+      return mesh;
+    }
+
+    function createSlab(parent, w, d, x, z) {
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.4, d), floorSlabMat);
+      slab.position.set(x, 0.2, z);
+      slab.receiveShadow = true;
+      parent.add(slab);
+      return slab;
+    }
+
+    function createWall(parent, w, h, d, x, y, z, mat = wallSolidMat) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      wall.position.set(x, y, z);
+      wall.castShadow = true;
+      parent.add(wall);
+      return wall;
+    }
+
+    function addAvatar(parent, x, z, colorHex = 0x38bdf8, standing = true) {
+      const g = new THREE.Group();
+      g.position.set(x, 0.4, z);
+      const m = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 12), m);
+      head.position.y = standing ? 2.3 : 1.6;
+      g.add(head);
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.35, standing ? 1.1 : 0.8, 12), m);
+      body.position.y = standing ? 1.5 : 1.05;
+      g.add(body);
+      parent.add(g);
+    }
+
+    // 5. SENSOR VISUALIZATION MARKERS (CCTV, Flame, MQ2, Water, DHT22, PIR)
+    const sensorMarkers = [];
+    const sensorList = [
+      { id: 'CCTV-GF-GATE', name: 'AI Face & Access Camera', room: 'GF Main Gate', type: 'cctv', status: 'ONLINE', reading: '30 FPS | 99.4% Auth', spec: 'Hikvision PoE AI-Edge RTSP', pos: [-18, 5.0, 12], floor: 'gf', icon: '📹', color: 0x06b6d4 },
+      { id: 'SRV-SEC-ROOM', name: 'Central Video Wall Broker', room: 'GF Security Center', type: 'srv', status: 'ONLINE', reading: '18 Nodes | 2ms Ping', spec: 'Dual ESP32-S3 + MQTT Broker', pos: [-18, 5.5, -18], floor: 'gf', icon: '🖥️', color: 0x0284c7 },
+      { id: 'DHT-G01', name: 'DHT22 Climate Sensor', room: 'Classroom G-01', type: 'dht', status: 'NORMAL', reading: '23.6°C | 52% RH', spec: 'DHT22 AM2302 (1-Wire GPIO 4)', pos: [1, 6.2, -10], floor: 'gf', icon: '🌡', color: 0x10b981 },
+      { id: 'PIR-G02', name: 'PIR Motion Sensor (Eco)', room: 'Classroom G-02', type: 'pir', status: 'STANDBY', reading: 'Motion=0 | HVAC Off', spec: 'HC-SR501 Microwave Radar', pos: [20, 6.2, -10], floor: 'gf', icon: '👤', color: 0x64748b },
+      { id: 'CAM-G03', name: 'Faculty Attendance AI Cam', room: 'Classroom G-03', type: 'cctv', status: 'ALERT', reading: 'Students: 28 | Faculty Missing', spec: 'ESP32-CAM YOLO Attendance Node', pos: [1, 6.2, 10], floor: 'gf', icon: '⚠️', color: 0xf59e0b },
+      { id: 'VALVE-WATER', name: 'Water Sensor & Solenoid', room: 'GF Utility & Water', type: 'water', status: 'ARMED', reading: '3.8 BAR | Solenoid Open', spec: 'Liquid Contact Sensor + 12V Valve', pos: [22, 3.8, 12], floor: 'gf', icon: '💧', color: 0x3b82f6 },
+      { id: 'FIRE-1F-LAB', name: 'Flame & MQ2 Gas Sensor', room: '1F Robotics Lab', type: 'fire', status: 'NORMAL', reading: 'IR=12 | Smoke=48 PPM', spec: 'IR Photodiode 760nm + MQ-2', pos: [20, 6.2, -10], floor: 'f1', icon: '🔥', color: 0xef4444 },
+      { id: 'CCTV-1F-CORR', name: 'Corridor AI Fight Camera', room: '1F North Corridor', type: 'cctv', status: 'ONLINE', reading: '30 FPS | YOLOv8-Fight', spec: 'Sony IMX335 AI Edge Cam', pos: [0, 6.2, 2], floor: 'f1', icon: '📹', color: 0x06b6d4 },
+      { id: 'DHT-FACULTY', name: 'Faculty Cabin DHT22 Pod', room: '1F Faculty Offices', type: 'dht', status: 'NORMAL', reading: '22.8°C | 49% RH', spec: 'DHT22 AM2302 Climate Node', pos: [-18, 6.2, 0], floor: 'f1', icon: '🌡', color: 0x10b981 },
+      { id: 'SEMINAR-PIR', name: 'Seminar Hall PIR & CO2', room: '2F Seminar Hall', type: 'pir', status: 'NORMAL', reading: 'CO2: 520 PPM | Occ: 38', spec: 'Sensirion SCD40 NDIR + PIR', pos: [-14, 6.2, -2], floor: 'f2', icon: '👤', color: 0xa855f7 },
+      { id: 'CCTV-2F-STAIR', name: 'Stairwell Smoking Detection', room: '2F Staircase Atrium', type: 'cctv', status: 'ONLINE', reading: 'YOLOv8-Smoke Active', spec: 'AI Edge Optical Camera', pos: [-7, 6.2, 2], floor: 'f2', icon: '🚬', color: 0x06b6d4 },
+      // Acoustic Surveillance & Microphone Nodes (NEW)
+      { id: 'MIC-G01', name: 'Classroom Acoustic & Speech Node', room: 'Classroom G-01', type: 'audio', status: 'LECTURE DETECTED', reading: '58 dB | 240 Hz Voice Formant', spec: 'MAX9814 AGC Microphone', pos: [-4, 6.2, -10], floor: 'gf', icon: '🎙️', color: 0xa855f7 },
+      { id: 'MIC-G03', name: 'Acoustic Absence Verification Node', room: 'Classroom G-03', type: 'audio', status: 'VOCAL SILENCE', reading: '36 dB | No Speech (< 45 dB)', spec: 'MAX9814 Audio Node (GPIO 39)', pos: [-4, 6.2, 10], floor: 'gf', icon: '🎙️', color: 0xf59e0b },
+      { id: 'MIC-1F-CORR', name: 'Corridor Acoustic Shock Detector', room: '1F North Corridor', type: 'audio', status: 'MONITORING', reading: '42 dB | Ambient Normal', spec: 'INMP441 Acoustic Shock Node', pos: [4, 6.2, 2], floor: 'f1', icon: '🎙️', color: 0x8b5cf6 },
+      { id: 'MIC-2F-STAIR', name: 'Secluded Zone Acoustic Sensor', room: '2F Staircase Atrium', type: 'audio', status: 'MONITORING', reading: '28 dB | Secluded Quiet', spec: 'Acoustic Anomaly + Smoke Correlator', pos: [-11, 6.2, 2], floor: 'f2', icon: '🎙️', color: 0x06b6d4 }
+    ];
+
+    function create3DSensorMarker(sensorData) {
+      const parent = floorGroups[sensorData.floor];
+      const markerGroup = new THREE.Group();
+      markerGroup.position.set(sensorData.pos[0], sensorData.pos[1], sensorData.pos[2]);
+
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: sensorData.color,
+        emissive: sensorData.color,
+        emissiveIntensity: 0.9,
+        roughness: 0.2
+      });
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), coreMat);
+      markerGroup.add(core);
+
+      const ringMat = new THREE.MeshBasicMaterial({ color: sensorData.color, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 24), ringMat);
+      ring.rotation.x = Math.PI / 2;
+      markerGroup.add(ring);
+
+      markerGroup.userData = sensorData;
+      parent.add(markerGroup);
+      sensorMarkers.push({ group: markerGroup, core, ring, data: sensorData });
+    }
+
+    // -------------------------------------------------------------------------
+    // GROUND FLOOR (GF)
+    // -------------------------------------------------------------------------
+    createSlab(floorGroups.gf, 58, 38, 0, 0);
+    createWall(floorGroups.gf, 58, 7.8, 0.6, 0, 4.0, -19);
+    createWall(floorGroups.gf, 0.6, 7.8, 38, -29, 4.0, 0);
+    createWall(floorGroups.gf, 58, 7.8, 0.4, 0, 4.0, 19, glassFacadeMat);
+    createWall(floorGroups.gf, 0.4, 7.8, 38, 29, 4.0, 0, glassFacadeMat);
+
+    createWall(floorGroups.gf, 0.4, 7.8, 38, -8, 4.0, 0, wallPartitionMat);
+    createWall(floorGroups.gf, 0.4, 7.8, 22, 10, 4.0, -8, wallPartitionMat);
+    createWall(floorGroups.gf, 38, 7.8, 0.4, 10, 4.0, 4, wallPartitionMat);
+
+    // Dynamic Heatmaps
+    createRoomHeatmapPlane(floorGroups.gf, 'control', 18, 16, -18, -10);
+    createRoomHeatmapPlane(floorGroups.gf, 'entrance', 18, 18, -18, 9);
+    createRoomHeatmapPlane(floorGroups.gf, 'g01', 16, 14, 1, -11);
+    createRoomHeatmapPlane(floorGroups.gf, 'g02', 16, 14, 19, -11);
+    createRoomHeatmapPlane(floorGroups.gf, 'g03', 16, 12, 1, 11);
+    createRoomHeatmapPlane(floorGroups.gf, 'water', 16, 12, 19, 11);
+
+    // Video Wall in Control Room
+    const videoWall = new THREE.Mesh(
+      new THREE.BoxGeometry(14, 4.8, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, emissive: 0x0369a1, emissiveIntensity: 0.9 })
+    );
+    videoWall.position.set(-18, 4.2, -18.6);
+    floorGroups.gf.add(videoWall);
+    addAvatar(floorGroups.gf, -18, -13, 0x0284c7, false);
+    addAvatar(floorGroups.gf, -14, -13, 0x0284c7, false);
+
+    // Turnstiles
+    for (let i = -24; i <= -14; i += 2.8) {
+      const turnstile = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 1.8), new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 }));
+      turnstile.position.set(i, 1.0, 10);
+      floorGroups.gf.add(turnstile);
+    }
+    addAvatar(floorGroups.gf, -12, 8, 0x1e40af, true);
+    addAvatar(floorGroups.gf, -21, 6, 0x38bdf8, true);
+
+    // Room G-01
+    addAvatar(floorGroups.gf, 1, -16, 0x10b981, true); // Prof Sharma
+    for (let r = -14; r <= -4; r += 4.5) {
+      for (let c = -4; c <= 6; c += 4.5) {
+        addAvatar(floorGroups.gf, c, r + 0.9, 0x38bdf8, false);
+      }
+    }
+
+    // Room G-03 (Faculty Absent)
+    for (let r = 8; r <= 15; r += 3.8) {
+      for (let c = -4; c <= 6; c += 4.5) {
+        addAvatar(floorGroups.gf, c, r + 0.8, 0xfbbf24, false);
+      }
+    }
+
+    // Water Utility & Solenoid
+    const waterPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 12, 16), new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.8 }));
+    waterPipe.rotation.z = Math.PI / 2;
+    waterPipe.position.set(22, 1.2, 12);
+    floorGroups.gf.add(waterPipe);
+
+    const solenoidValve = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.8, 1.4), new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.9 }));
+    solenoidValve.position.set(22, 1.4, 12);
+    floorGroups.gf.add(solenoidValve);
+
+    const puddleMesh = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 0.05, 32), new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.0, metalness: 0.9, roughness: 0.05 }));
+    puddleMesh.position.set(22, 0.44, 12);
+    floorGroups.gf.add(puddleMesh);
+
+    // -------------------------------------------------------------------------
+    // FIRST FLOOR (1F)
+    // -------------------------------------------------------------------------
+    createSlab(floorGroups.f1, 58, 38, 0, 0);
+    createWall(floorGroups.f1, 58, 7.8, 0.6, 0, 4.0, -19);
+    createWall(floorGroups.f1, 0.6, 7.8, 38, -29, 4.0, 0);
+    createWall(floorGroups.f1, 58, 7.8, 0.4, 0, 4.0, 19, glassFacadeMat);
+    createWall(floorGroups.f1, 0.4, 7.8, 38, 29, 4.0, 0, glassFacadeMat);
+
+    createWall(floorGroups.f1, 0.4, 7.8, 38, -6, 4.0, 0, wallPartitionMat);
+    createWall(floorGroups.f1, 0.4, 7.8, 38, 12, 4.0, 0, wallPartitionMat);
+    createWall(floorGroups.f1, 58, 7.8, 0.4, 0, 4.0, 2, wallPartitionMat);
+
+    createRoomHeatmapPlane(floorGroups.f1, 'faculty', 20, 36, -17, 0);
+    createRoomHeatmapPlane(floorGroups.f1, 'lab', 16, 18, 20, -9);
+    createRoomHeatmapPlane(floorGroups.f1, 'c101', 16, 18, 3, -9);
+
+    // 1F Lab Smoke Particles
+    const smokeGeo = new THREE.BufferGeometry();
+    const smokeCount = 200;
+    const smokePos = new Float32Array(smokeCount * 3);
+    for (let i = 0; i < smokeCount * 3; i += 3) {
+      smokePos[i] = 20 + (Math.random() - 0.5) * 5;
+      smokePos[i + 1] = 1.0 + Math.random() * 5.5;
+      smokePos[i + 2] = -10 + (Math.random() - 0.5) * 5;
+    }
+    smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePos, 3));
+    const smokeMat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 1.2, transparent: true, opacity: 0.0, depthWrite: false });
+    const smokeParticles = new THREE.Points(smokeGeo, smokeMat);
+    floorGroups.f1.add(smokeParticles);
+
+    const strobeBeacon = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x000000, emissiveIntensity: 0.0 }));
+    strobeBeacon.position.set(20, 5.5, -10);
+    floorGroups.f1.add(strobeBeacon);
+
+    // -------------------------------------------------------------------------
+    // SECOND FLOOR (2F)
+    // -------------------------------------------------------------------------
+    createSlab(floorGroups.f2, 58, 38, 0, 0);
+    createWall(floorGroups.f2, 58, 7.8, 0.6, 0, 4.0, -19);
+    createWall(floorGroups.f2, 0.6, 7.8, 38, -29, 4.0, 0);
+    createWall(floorGroups.f2, 58, 7.8, 0.4, 0, 4.0, 19, glassFacadeMat);
+    createWall(floorGroups.f2, 0.4, 7.8, 38, 29, 4.0, 0, glassFacadeMat);
+
+    createWall(floorGroups.f2, 0.4, 7.8, 38, 2, 4.0, 0, wallPartitionMat);
+    createWall(floorGroups.f2, 30, 7.8, 0.4, 16, 4.0, 2, wallPartitionMat);
+
+    createRoomHeatmapPlane(floorGroups.f2, 'seminar', 28, 36, -14, 0);
+    createRoomHeatmapPlane(floorGroups.f2, 'admin', 24, 18, 15, -9);
+
+    const seminarScreen = new THREE.Mesh(new THREE.BoxGeometry(16, 4.5, 0.1), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.7 }));
+    seminarScreen.position.set(-14, 4.2, -18.6);
+    floorGroups.f2.add(seminarScreen);
+
+    // Add all sensor markers to scene
+    sensorList.forEach(s => create3DSensorMarker(s));
+
+    // -------------------------------------------------------------------------
+    // IOT PACKET LINES & EVACUATION ROUTE ARROWS
+    // -------------------------------------------------------------------------
+    const networkPaths = [
+      new THREE.QuadraticBezierCurve3(new THREE.Vector3(1, 6.2, -10), new THREE.Vector3(-8, 9, -14), new THREE.Vector3(-18, 5.5, -18)),
+      new THREE.QuadraticBezierCurve3(new THREE.Vector3(1, 6.2, 10), new THREE.Vector3(-10, 8, -6), new THREE.Vector3(-18, 5.5, -18)),
+      new THREE.QuadraticBezierCurve3(new THREE.Vector3(20, 14.8, -10), new THREE.Vector3(0, 14, -16), new THREE.Vector3(-18, 5.5, -18)),
+      new THREE.QuadraticBezierCurve3(new THREE.Vector3(-14, 23.2, -2), new THREE.Vector3(-16, 16, -12), new THREE.Vector3(-18, 5.5, -18)),
+      new THREE.QuadraticBezierCurve3(new THREE.Vector3(22, 3.8, 12), new THREE.Vector3(5, 7, -5), new THREE.Vector3(-18, 5.5, -18))
+    ];
+
+    const packetGroup = new THREE.Group();
+    scene.add(packetGroup);
+    const animatedPackets = [];
+
+    networkPaths.forEach(curve => {
+      const pts = curve.getPoints(36);
+      const track = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.35 }));
+      packetGroup.add(track);
+
+      const packet = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 12), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 1.5 }));
+      packetGroup.add(packet);
+      animatedPackets.push({ mesh: packet, curve, progress: Math.random() });
+    });
+
+    const evacGroup = new THREE.Group();
+    scene.add(evacGroup);
+    [[18, 0.44, 2], [8, 0.44, 2], [0, 0.44, 2], [-7, 0.44, 2], [-18, 0.44, 2], [-18, 0.44, 10]].forEach(([ax, ay, az]) => {
+      const arrow = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.22, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x10b981, emissiveIntensity: 0.9 }));
+      arrow.position.set(ax, ay, az);
+      arrow.rotation.z = Math.PI / 2;
+      evacGroup.add(arrow);
+    });
+
+    // -------------------------------------------------------------------------
+    // CAMERA PRESET SMOOTH TRANSITIONS
+    // -------------------------------------------------------------------------
+    function setCameraPreset(key) {
+      const p = cameraPresets[key];
+      if (!p) return;
+
+      ['campus', 'classroom', 'security', 'firezone', 'sensor'].forEach(k => {
+        const btn = document.getElementById(`cam-${k}`);
+        if (btn) btn.className = 'px-2.5 py-1 text-xs font-mono rounded-lg glass-card text-slate-300 hover:text-white transition-all flex items-center gap-1.5';
+      });
+      const activeBtn = document.getElementById(`cam-${key}`);
+      if (activeBtn) activeBtn.className = 'px-2.5 py-1 text-xs font-mono font-bold rounded-lg bg-cyan-600 text-white shadow transition-all flex items-center gap-1.5';
+
+      new TWEEN.Tween(controls.target).to(p.target, 1100).easing(TWEEN.Easing.Cubic.Out).start();
+      new TWEEN.Tween(camera.position).to(p.pos, 1100).easing(TWEEN.Easing.Cubic.Out).start();
+      playBeep(900, 'sine', 0.08);
+    }
+
+    function focusRoom(room) {
+      if (room === 'control-room') setCameraPreset('security');
+      else if (room === 'class-g03') setCameraPreset('classroom');
+      else if (room === 'lab') setCameraPreset('firezone');
+      else if (room === 'water-room') {
+        new TWEEN.Tween(controls.target).to({ x: 22, y: 2, z: 12 }, 1000).easing(TWEEN.Easing.Cubic.Out).start();
+        new TWEEN.Tween(camera.position).to({ x: 28, y: 12, z: 26 }, 1000).easing(TWEEN.Easing.Cubic.Out).start();
+      } else if (room === 'seminar-hall') {
+        new TWEEN.Tween(controls.target).to({ x: -14, y: 20, z: 0 }, 1000).easing(TWEEN.Easing.Cubic.Out).start();
+        new TWEEN.Tween(camera.position).to({ x: -6, y: 32, z: 24 }, 1000).easing(TWEEN.Easing.Cubic.Out).start();
+      } else if (room === 'entrance') {
+        new TWEEN.Tween(controls.target).to({ x: -18, y: 2, z: 10 }, 1000).easing(TWEEN.Easing.Cubic.Out).start();
+        new TWEEN.Tween(camera.position).to({ x: -10, y: 12, z: 28 }, 1000).easing(TWEEN.Easing.Cubic.Out).start();
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. LIVE DEMO MODE (Fullscreen, Panels Hidden, Auto-Orbit, Mini Floating Alert)
+    // -------------------------------------------------------------------------
+    let isLiveDemoMode = false;
+
+    function toggleLiveDemoMode() {
+      isLiveDemoMode = !isLiveDemoMode;
+      const btn = document.getElementById('btn-live-demo');
+      const floatingAlert = document.getElementById('demo-floating-alert');
+
+      if (isLiveDemoMode) {
+        // Temporarily collapse sidebars
+        toggleLeftPanel(false);
+        toggleRightPanel(false);
+
+        // Auto-orbit camera
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.85;
+
+        // Fullscreen
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+
+        btn.classList.add('ring-2', 'ring-cyan-300', 'bg-cyan-500');
+        btn.innerHTML = '<span>⏸</span> EXIT DEMO';
+
+        floatingAlert.classList.remove('hidden');
+        floatingAlert.classList.add('flex');
+
+        setCameraPreset('campus');
+        appendLog('Live Demo Mode initiated. Auto-orbiting campus twin with active telemetry.', 'text-cyan-400 font-bold');
+        speakNarration("Live demo mode activated. Fullscreen campus digital twin active with live background telemetry.");
+      } else {
+        controls.autoRotate = false;
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+        btn.classList.remove('ring-2', 'ring-cyan-300', 'bg-cyan-500');
+        btn.innerHTML = '<span>🚀</span> LIVE DEMO';
+
+        floatingAlert.classList.add('hidden');
+        floatingAlert.classList.remove('flex');
+
+        // Restore panels
+        toggleLeftPanel(true);
+        toggleRightPanel(true);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. FLOOR VIEW CONTROLLER & VERTICAL EXPLODE
+    // -------------------------------------------------------------------------
+    function onExplodeChange(val) {
+      document.getElementById('explode-val').innerText = `${(val * 2.5).toFixed(1)}x`;
+      const sep = val * 14.0;
+      floorGroups.f1.position.y = FLOOR_Y_BASE.f1 + sep;
+      floorGroups.f2.position.y = FLOOR_Y_BASE.f2 + sep * 2;
+    }
+
+    function setFloorFilter(fl) {
+      ['all', 'gf', '1f', '2f'].forEach(f => {
+        const btn = document.getElementById(`flt-${f}`);
+        if (btn) btn.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all';
+      });
+      document.getElementById(`flt-${fl.toLowerCase()}`).className = 'px-2.5 py-1 rounded-lg bg-cyan-600 text-white font-bold shadow transition-all';
+
+      if (fl === 'ALL') {
+        floorGroups.gf.visible = true; floorGroups.f1.visible = true; floorGroups.f2.visible = true;
+        setCameraPreset('campus');
+      } else if (fl === 'GF') {
+        floorGroups.gf.visible = true; floorGroups.f1.visible = false; floorGroups.f2.visible = false;
+        setCameraPreset('classroom');
+      } else if (fl === '1F') {
+        floorGroups.gf.visible = false; floorGroups.f1.visible = true; floorGroups.f2.visible = false;
+        setCameraPreset('firezone');
+      } else if (fl === '2F') {
+        floorGroups.gf.visible = false; floorGroups.f1.visible = false; floorGroups.f2.visible = true;
+        setCameraPreset('classroom');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. DIGITAL TWIN HEATMAP DYNAMIC COLORING
+    // -------------------------------------------------------------------------
+    function setRoomHeatmap(key, colorHex, intensity = 0.5) {
+      const mesh = heatmapMeshes[key];
+      if (!mesh) return;
+      mesh.material.color.setHex(colorHex);
+      mesh.material.emissive.setHex(colorHex);
+      mesh.material.emissiveIntensity = intensity;
+    }
+
+    // -------------------------------------------------------------------------
+    // INCIDENT SIMULATOR ENGINE (ALL SCENARIOS FULLY PRESERVED)
+    // -------------------------------------------------------------------------
+    let currentDrill = 'normal';
+
+    function triggerDrill(type) {
+      currentDrill = type;
+      playBeep(850, 'square', 0.15);
+
+      const bannerCont = document.getElementById('alert-banner-container');
+      const valMQ2 = document.getElementById('val-mq2');
+      const barMQ2 = document.getElementById('bar-mq2');
+      const valPress = document.getElementById('val-water-press');
+      const valSolenoid = document.getElementById('val-solenoid');
+      const valSolenoidBadge = document.getElementById('val-solenoid-badge');
+      const labSmokePPM = document.getElementById('lab-smoke-ppm');
+      const labHazardLabel = document.getElementById('lab-hazard-label');
+      const labDot = document.getElementById('lab-indicator-dot');
+      const demoAlertText = document.getElementById('demo-alert-text');
+      const badgeAudio = document.getElementById('badge-audio-status');
+      const txtAudioDb = document.getElementById('txt-audio-db');
+      const dbG01 = document.getElementById('db-g01');
+      const dbG03 = document.getElementById('db-g03');
+      const dbCorr = document.getElementById('db-corridor');
+      const dbStair = document.getElementById('db-stairwell');
+
+      // Reset base heatmaps
+      setRoomHeatmap('control', 0x0284c7, 0.2);
+      setRoomHeatmap('entrance', 0x10b981, 0.2);
+      setRoomHeatmap('g01', 0x10b981, 0.2);
+      setRoomHeatmap('g02', 0x64748b, 0.1);
+      setRoomHeatmap('g03', 0xf59e0b, 0.4); // Persistent alert for faculty absence
+      setRoomHeatmap('water', 0x0284c7, 0.2);
+      setRoomHeatmap('faculty', 0x10b981, 0.2);
+      setRoomHeatmap('lab', 0x10b981, 0.2);
+      setRoomHeatmap('c101', 0x10b981, 0.2);
+      setRoomHeatmap('seminar', 0xa855f7, 0.2);
+      setRoomHeatmap('admin', 0x10b981, 0.2);
+
+      if (type === 'normal') {
+        bannerCont.innerHTML = `
+          <div class="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-start gap-3">
+            <div class="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400"><i data-lucide="shield-check" class="w-5 h-5"></i></div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between"><span class="text-xs font-bold font-mono text-emerald-300">CAMPUS SECURE</span><span class="text-[10px] font-mono text-slate-400">NORMAL</span></div>
+              <p class="text-[11px] text-slate-300 mt-0.5">All 18 sensor zones operating within safe baseline thresholds.</p>
+            </div>
+          </div>
+        `;
+        valMQ2.innerText = '48';
+        barMQ2.style.width = '12%';
+        valPress.innerText = '3.8';
+        valSolenoid.innerText = 'OPEN';
+        valSolenoid.className = 'text-emerald-400 font-bold';
+        valSolenoidBadge.innerText = 'VALVE OPEN';
+        valSolenoidBadge.className = 'px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-bold';
+        labSmokePPM.innerText = '48 PPM';
+        labHazardLabel.innerText = 'Flame: SAFE | Smoke: OK';
+        labDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+        smokeParticles.material.opacity = 0.0;
+        puddleMesh.material.opacity = 0.0;
+        strobeBeacon.material.emissiveIntensity = 0.0;
+        demoAlertText.innerText = 'ALL CAMPUS SYSTEMS NOMINAL';
+
+        if (badgeAudio) {
+          badgeAudio.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30';
+          badgeAudio.innerText = 'CALM: 42 dB';
+        }
+        if (txtAudioDb) txtAudioDb.innerText = '42 dB';
+        if (dbG01) dbG01.innerText = '58 dB [Lecture]';
+        if (dbG03) dbG03.innerText = '36 dB [Silent]';
+        if (dbCorr) dbCorr.innerText = '42 dB [Normal]';
+        if (dbStair) dbStair.innerText = '28 dB [Quiet]';
+
+        appendLog('Simulation reset to normal campus equilibrium.', 'text-emerald-400');
+        setCameraPreset('campus');
+      }
+
+      else if (type === 'fire') {
+        playAlarmSiren();
+        bannerCont.innerHTML = `
+          <div class="p-3 rounded-xl border border-rose-500/60 bg-rose-500/20 glow-emergency flex items-start gap-3">
+            <div class="p-1.5 rounded-lg bg-rose-500/30 text-rose-300 animate-bounce"><i data-lucide="flame" class="w-5 h-5"></i></div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between"><span class="text-xs font-bold font-mono text-rose-300">🔥 FIRE & SMOKE HAZARD</span><span class="text-[10px] font-mono text-rose-300 font-bold">1F LAB</span></div>
+              <p class="text-[11px] text-slate-200 mt-0.5">Flame sensor tripped! Smoke at 740 PPM. Evacuation alert broadcasted.</p>
+            </div>
+          </div>
+        `;
+        valMQ2.innerText = '740';
+        barMQ2.style.width = '92%';
+        labSmokePPM.innerText = '740 PPM';
+        labHazardLabel.innerText = 'FLAME TRIGGERED! SIREN ON';
+        labDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
+        smokeParticles.material.opacity = 0.85;
+        strobeBeacon.material.emissiveIntensity = 1.8;
+        strobeBeacon.material.emissive.setHex(0xef4444);
+        setRoomHeatmap('lab', 0xef4444, 0.9); // RED HEATMAP
+        demoAlertText.innerText = '🔥 CRITICAL: FIRE IN 1F ROBOTICS LAB';
+        setCameraPreset('firezone');
+        appendLog('[EMERGENCY] Flame sensor active in 1F Robotics Lab! Buzzer & strobes triggered.', 'text-rose-400 font-bold');
+        speakNarration("Critical fire alert in first floor robotics laboratory. Evacuation alarms activated.");
+      }
+
+      else if (type === 'gas') {
+        playAlarmSiren();
+        bannerCont.innerHTML = `
+          <div class="p-3 rounded-xl border border-amber-500/60 bg-amber-500/20 flex items-start gap-3">
+            <div class="p-1.5 rounded-lg bg-amber-500/30 text-amber-300 animate-pulse"><i data-lucide="wind" class="w-5 h-5"></i></div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between"><span class="text-xs font-bold font-mono text-amber-300">⚠️ TOXIC GAS LEAKAGE</span><span class="text-[10px] font-mono text-amber-300 font-bold">MQ2 ALERT</span></div>
+              <p class="text-[11px] text-slate-200 mt-0.5">MQ-2 sensor detected combustible gas spike at 680 PPM. Exhaust dampers closed.</p>
+            </div>
+          </div>
+        `;
+        valMQ2.innerText = '680';
+        barMQ2.style.width = '85%';
+        setRoomHeatmap('lab', 0xf59e0b, 0.75); // ORANGE/AMBER HEATMAP
+        demoAlertText.innerText = '⚠️ WARNING: TOXIC GAS SPIKE 680 PPM';
+        setCameraPreset('firezone');
+        appendLog('[WARNING] MQ-2 gas concentration 680 PPM exceeds threshold in 1F Lab.', 'text-amber-300 font-bold');
+      }
+
+      else if (type === 'water') {
+        playBeep(440, 'triangle', 0.4);
+        bannerCont.innerHTML = `
+          <div class="p-3 rounded-xl border border-blue-500/60 bg-blue-500/20 flex items-start gap-3">
+            <div class="p-1.5 rounded-lg bg-blue-500/30 text-blue-300 animate-bounce"><i data-lucide="droplet" class="w-5 h-5"></i></div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between"><span class="text-xs font-bold font-mono text-blue-300">💧 WATER PIPELINE LEAK</span><span class="text-[10px] font-mono text-blue-300 font-bold">GF UTILITY</span></div>
+              <p class="text-[11px] text-slate-200 mt-0.5">Floor liquid sensor tripped. Motorized solenoid valve auto-isolated.</p>
+            </div>
+          </div>
+        `;
+        valPress.innerText = '0.0';
+        valSolenoid.innerText = 'SHUTOFF';
+        valSolenoid.className = 'text-rose-400 font-bold animate-pulse';
+        valSolenoidBadge.innerText = 'AUTO SHUTOFF';
+        valSolenoidBadge.className = 'px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400 font-bold';
+        puddleMesh.material.opacity = 0.85;
+        setRoomHeatmap('water', 0x3b82f6, 0.8); // BLUE HEATMAP
+        demoAlertText.innerText = '💧 WATER LEAK: SOLENOID ISOLATED';
+        focusRoom('water-room');
+        appendLog('[ACTUATOR] Main inlet solenoid valve tripped to CLOSED state.', 'text-blue-300 font-bold');
+      }
+
+      else if (type === 'absence') {
+        playBeep(700, 'sine', 0.2);
+        setRoomHeatmap('g03', 0xf59e0b, 0.9); // AMBER/YELLOW HEATMAP
+        demoAlertText.innerText = '⚠️ FACULTY ABSENT: ROOM G-03 (28 STUDENTS)';
+        setCameraPreset('classroom');
+
+        if (badgeAudio) {
+          badgeAudio.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30';
+          badgeAudio.innerText = '⚠️ VOCAL SILENCE: 36 dB';
+        }
+        if (txtAudioDb) txtAudioDb.innerText = '36 dB';
+        if (dbG03) dbG03.innerText = '36 dB [No Speech < 45dB]';
+
+        appendLog('[ANOMALY] Classroom G-03: Timetable mismatch. Faculty not present at lectern.', 'text-amber-300');
+        appendLog('[ACOUSTIC] Room G-03 audio level at 36 dB (silence threshold < 45 dB). Confirms absence of faculty lecture speech.', 'text-amber-300 font-bold');
+        speakNarration("Faculty attendance anomaly flagged in classroom G zero three. Vocal silence confirmed.");
+      }
+
+      else if (type === 'fight' || type === 'smoke') {
+        playAlarmSiren();
+        switchViewMode('cctv');
+        demoAlertText.innerText = type === 'fight' ? '🥊 AI: STUDENT ALTERCATION DETECTED' : '🚬 AI: SMOKING DETECTED IN STAIRWELL';
+
+        if (type === 'fight') {
+          if (badgeAudio) {
+            badgeAudio.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40 animate-pulse';
+            badgeAudio.innerText = '🚨 ACOUSTIC SHOCK: 94 dB';
+          }
+          if (txtAudioDb) txtAudioDb.innerText = '94 dB';
+          if (dbCorr) dbCorr.innerText = '94 dB [🚨 FIGHT/SCREAM]';
+          appendLog('[ACOUSTIC] Loud acoustic shock detected: 94 dB in 1F Corridor (> 85 dB threshold). High correlation with physical fight.', 'text-rose-400 font-bold');
+        } else {
+          if (badgeAudio) {
+            badgeAudio.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30';
+            badgeAudio.innerText = '🚬 SECLUDED VIOLATION';
+          }
+          if (txtAudioDb) txtAudioDb.innerText = '32 dB';
+          if (dbStair) dbStair.innerText = '32 dB [🚬 Smoke Detected]';
+          appendLog('[ACOUSTIC/SENSOR] 2F Stairwell anomaly: Secluded acoustic profile + MQ-2 aerosol spike detected. Non-smoking zone violation logged.', 'text-purple-300 font-bold');
+        }
+
+        appendLog(`[AI VISION] Deep learning model classified ${type === 'fight' ? 'student altercation' : 'smoking violation'}.`, 'text-purple-300 font-bold');
+        speakNarration(`AI computer vision detected ${type === 'fight' ? 'violent altercation' : 'smoking violation'} on surveillance camera.`);
+      }
+
+      lucide.createIcons();
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. EMERGENCY COMMAND MODE CONTROLLER
+    // -------------------------------------------------------------------------
+    let isEmergencyMode = false;
+
+    function toggleEmergencyMode() {
+      isEmergencyMode = !isEmergencyMode;
+      const btn = document.getElementById('btn-emergency-mode');
+
+      if (isEmergencyMode) {
+        btn.classList.add('glow-emergency', 'ring-4', 'ring-red-400');
+        btn.innerText = '🚨 ALARM ACTIVE (STOP)';
+
+        ambientLight.color.setHex(0x450a0a);
+        ambientLight.intensity = 0.4;
+        sunLight.intensity = 0.3;
+        emergencyRedLight.intensity = 3.5;
+
+        triggerDrill('fire');
+        speakNarration("Emergency mode initiated. Campus security protocol level four active.");
+      } else {
+        btn.classList.remove('glow-emergency', 'ring-4', 'ring-red-400');
+        btn.innerHTML = '<span class="text-sm">🚨</span> EMERGENCY MODE';
+
+        ambientLight.color.setHex(0xdbeafe);
+        ambientLight.intensity = 0.7;
+        sunLight.intensity = 1.4;
+        emergencyRedLight.intensity = 0.0;
+
+        triggerDrill('normal');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 9. SIH PRESENTATION MODE (9-STEP GUIDED DEMONSTRATION)
+    // -------------------------------------------------------------------------
+    let tourCurrentStep = 0;
+    const tourSteps = [
+      {
+        title: "1. Classroom Occupancy & Climate Monitoring",
+        desc: "Monitoring Classroom G-01 with 42 verified students and Prof. Sharma. PIR motion confirms presence and DHT22 telemetry balances room comfort.",
+        cam: 'classroom',
+        drill: 'normal',
+        narration: "Module one: Classroom occupancy monitoring. Passive infrared sensors verify student presence while DHT22 monitors maintain ambient climate."
+      },
+      {
+        title: "2. Faculty Absence Anomaly Detection",
+        desc: "Room G-03 detects 28 students present, but facial recognition detects the faculty member is absent (>15 min), automatically alerting the security office.",
+        cam: 'classroom',
+        drill: 'absence',
+        narration: "Module two: Faculty absence detection. The system flags that 28 students are present without a teacher, dispatching an immediate dashboard alert."
+      },
+      {
+        title: "3. AI CCTV: Student Fight Detection",
+        desc: "Edge YOLO deep learning analyzes corridor CCTV feeds in real time, detecting violent altercations with 94.2% confidence.",
+        cam: 'campus',
+        drill: 'fight',
+        narration: "Module three: AI fight detection. Deep learning models classify violent motion trajectories in public corridors."
+      },
+      {
+        title: "4. AI CCTV: Smoking Detection in Stairwells",
+        desc: "Camera CAM-204 detects cigarette smoke plumes in the 2F staircase atrium, flagging unauthorized smoking violations.",
+        cam: 'campus',
+        drill: 'smoke',
+        narration: "Module four: Smoking detection. Optical cameras detect lit cigarettes and vape plumes in non-smoking university zones."
+      },
+      {
+        title: "5. Fire & Smoke Detection System",
+        desc: "Optical flame sensor and MQ-2 smoke detector in 1F Computer Lab trigger 85dB alarm buzzers, strobe beacons, and smoke particle effects.",
+        cam: 'firezone',
+        drill: 'fire',
+        narration: "Module five: Fire detection system. Optical flame sensors and smoke detectors immediately actuate localized alarm beacons."
+      },
+      {
+        title: "6. Gas Leakage Monitoring & Indoor Air Quality",
+        desc: "MQ-2 sensors monitor combustible gases, activating exhaust dampers and dispatching automatic hazard notifications when exceeding 400 PPM.",
+        cam: 'firezone',
+        drill: 'gas',
+        narration: "Module six: Gas leakage detection. Sensitive gas sensors track ppm levels, triggering automatic air exhaust dampers."
+      },
+      {
+        title: "7. Water Leakage & Automated Solenoid Shutoff",
+        desc: "Liquid contact sensor trips near pipelines, immediately actuating a 12V motorized solenoid valve to isolate the main pipe and prevent flooding.",
+        cam: 'security',
+        drill: 'water',
+        narration: "Module seven: Water leakage management. Accumulation sensors trip an automatic brass solenoid valve to isolate pipe pressure."
+      },
+      {
+        title: "8. Central Security Office Alert Handling",
+        desc: "Ground floor security monitoring center receives real-time encrypted MQTT telemetry from all 18 ESP32 mesh nodes with sub-15ms latency.",
+        cam: 'security',
+        drill: 'normal',
+        narration: "Module eight: Security monitoring center. The master dashboard aggregates all telemetry feeds onto high-visibility monitoring displays."
+      },
+      {
+        title: "9. Real-Time Dashboard Analytics",
+        desc: "Comprehensive AI analytics dashboard tracking 24-hour occupancy trends, multi-hazard risk radar, and campus safety scorecard (98.4 / 100).",
+        cam: 'campus',
+        drill: 'normal',
+        narration: "Module nine: Real-time analytics. Deep predictive risk models and safety scorecards provide total situational awareness for campus safety."
+      }
+    ];
+
+    function startSIHPresentationTour() {
+      tourCurrentStep = 0;
+      document.getElementById('tour-overlay').classList.remove('hidden');
+      document.getElementById('tour-overlay').classList.add('flex');
+      applyTourStep(0);
+    }
+
+    function applyTourStep(idx) {
+      const step = tourSteps[idx];
+      document.getElementById('tour-step-badge').innerText = `Step ${idx + 1} / ${tourSteps.length}`;
+      document.getElementById('tour-step-title').innerText = step.title;
+      document.getElementById('tour-step-desc').innerText = step.desc;
+
+      if (idx === 2 || idx === 3) {
+        switchViewMode('cctv');
+      } else if (idx === 8) {
+        switchViewMode('analytics');
+      } else {
+        switchViewMode('3d');
+        setCameraPreset(step.cam);
+      }
+
+      triggerDrill(step.drill);
+      speakNarration(step.narration);
+    }
+
+    function nextTourStep() {
+      tourCurrentStep = (tourCurrentStep + 1) % tourSteps.length;
+      applyTourStep(tourCurrentStep);
+    }
+
+    function stopSIHPresentationTour() {
+      document.getElementById('tour-overlay').classList.add('hidden');
+      document.getElementById('tour-overlay').classList.remove('flex');
+      switchViewMode('3d');
+      triggerDrill('normal');
+      setCameraPreset('campus');
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+
+    // -------------------------------------------------------------------------
+    // AI ANALYTICS DASHBOARD (CHART.JS)
+    // -------------------------------------------------------------------------
+    let chartsInitialized = false;
+
+    function initAnalyticsCharts() {
+      if (chartsInitialized) return;
+      chartsInitialized = true;
+
+      new Chart(document.getElementById('chart-occupancy'), {
+        type: 'line',
+        data: {
+          labels: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'],
+          datasets: [
+            { label: 'Room G-01', data: [0, 42, 45, 40, 42, 10, 0], borderColor: '#06b6d4', tension: 0.3 },
+            { label: 'Room G-03', data: [0, 28, 28, 30, 28, 0, 0], borderColor: '#f59e0b', tension: 0.3 },
+            { label: 'Seminar Hall', data: [0, 0, 38, 55, 62, 0, 0], borderColor: '#a855f7', tension: 0.3 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } } }
+      });
+
+      new Chart(document.getElementById('chart-risk'), {
+        type: 'radar',
+        data: {
+          labels: ['Fire Risk', 'Toxic Gas', 'Water Leak', 'Electrical Surge', 'Altercation', 'Unauthorized Access'],
+          datasets: [{
+            label: 'Current Campus Risk Index',
+            data: [15, 12, 8, 20, 18, 5],
+            backgroundColor: 'rgba(6, 182, 212, 0.25)',
+            borderColor: '#06b6d4',
+            pointBackgroundColor: '#38bdf8'
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } } }
+      });
+
+      new Chart(document.getElementById('chart-gas'), {
+        type: 'line',
+        data: {
+          labels: ['18:00', '18:15', '18:30', '18:45', '19:00', '19:15', 'Now'],
+          datasets: [{
+            label: '1F Robotics Lab (PPM)',
+            data: [42, 45, 48, 52, 48, 49, 48],
+            fill: true,
+            backgroundColor: 'rgba(245, 158, 11, 0.2)',
+            borderColor: '#f59e0b',
+            tension: 0.3
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } } }
+      });
+
+      new Chart(document.getElementById('chart-threats'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Smoking Violations', 'Altercations', 'Faculty Absenteeism', 'Water Valve Anomaly'],
+          datasets: [{
+            data: [8, 4, 12, 2],
+            backgroundColor: ['#f59e0b', '#ef4444', '#eab308', '#3b82f6']
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } } }
+      });
+    }
+
+    // View Mode Switcher
+    function switchViewMode(mode) {
+      const cctvView = document.getElementById('view-cctv-wall');
+      const sensorsView = document.getElementById('view-sensors-grid');
+      const analyticsView = document.getElementById('view-analytics-dash');
+
+      ['3d', 'cctv', 'sensors', 'analytics'].forEach(m => {
+        const tab = document.getElementById(`tab-${m}`);
+        if (tab) tab.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5';
+      });
+      const activeTab = document.getElementById(`tab-${mode}`);
+      if (activeTab) activeTab.className = 'px-2.5 py-1 rounded-lg bg-cyan-600 text-white font-bold shadow transition-all flex items-center gap-1.5';
+
+      cctvView.classList.add('hidden');
+      sensorsView.classList.add('hidden');
+      analyticsView.classList.add('hidden');
+
+      if (mode === 'cctv') {
+        cctvView.classList.remove('hidden');
+        renderCCTVCanvases();
+      } else if (mode === 'sensors') {
+        sensorsView.classList.remove('hidden');
+      } else if (mode === 'analytics') {
+        analyticsView.classList.remove('hidden');
+        initAnalyticsCharts();
+      }
+    }
+
+    function renderCCTVCanvases() {
+      const audioStatusMap = {
+        1: currentDrill === 'fight' ? 'AUDIO: 94 dB [🚨 ACOUSTIC SHOCK / SCREAM]' : 'AUDIO: 42 dB [AMBIENT NORMAL]',
+        2: currentDrill === 'smoke' ? 'AUDIO: 32 dB [🚬 SECLUDED / SMOKE CORRELATED]' : 'AUDIO: 28 dB [SECLUDED QUIET]',
+        3: currentDrill === 'absence' ? 'AUDIO: 36 dB [⚠️ VOCAL SILENCE / NO LECTURE]' : 'AUDIO: 58 dB [LECTURE IN PROGRESS]',
+        4: 'AUDIO: 52 dB [TURNSTILE TRAFFIC]',
+        5: currentDrill === 'fire' ? 'AUDIO: 88 dB [🚨 FIRE ALARM SIREN]' : 'AUDIO: 46 dB [LAB WORK]',
+        6: currentDrill === 'water' ? 'AUDIO: 62 dB [VALVE SOLENOID TRIP]' : 'AUDIO: 38 dB [PIPE FLOW]'
+      };
+
+      for (let i = 1; i <= 6; i++) {
+        const cvs = document.getElementById(`canvas-cam${i}`);
+        if (!cvs) continue;
+        const ctx = cvs.getContext('2d');
+        const w = cvs.width, h = cvs.height;
+        ctx.fillStyle = '#070c18';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(w / 2, h / 2);
+        ctx.moveTo(w, 0); ctx.lineTo(w / 2, h / 2);
+        ctx.moveTo(0, h); ctx.lineTo(w / 2, h / 2);
+        ctx.moveTo(w, h); ctx.lineTo(w / 2, h / 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '11px "JetBrains Mono"';
+        ctx.fillText(`REC ● ${new Date().toISOString().substr(11, 8)} UTC`, 12, 22);
+
+        // Acoustic overlay on CCTV
+        const audioText = audioStatusMap[i] || 'AUDIO: 42 dB';
+        const isHazard = (i === 1 && currentDrill === 'fight') || (i === 2 && currentDrill === 'smoke') || (i === 3 && currentDrill === 'absence') || (i === 5 && currentDrill === 'fire');
+        ctx.fillStyle = isHazard ? '#f43f5e' : '#a855f7';
+        ctx.fillText(`🎙️ ${audioText}`, 12, h - 16);
+      }
+    }
+
+    function drawAudioVU(time) {
+      const cvs = document.getElementById('audio-vu-canvas');
+      if (!cvs) return;
+      const ctx = cvs.getContext('2d');
+      const w = cvs.width, h = cvs.height;
+      ctx.fillStyle = '#0a0f1d';
+      ctx.fillRect(0, 0, w, h);
+
+      const bars = 22;
+      const barW = (w / bars) - 2;
+      const isFight = currentDrill === 'fight';
+      const isAbsence = currentDrill === 'absence';
+      const isSmoke = currentDrill === 'smoke';
+
+      for (let i = 0; i < bars; i++) {
+        let val;
+        if (isFight) {
+          // Acoustic shock / high screaming decibels 85-110dB
+          val = (Math.sin(time * 16 + i * 0.9) * 0.35 + 0.65) * h * 0.92;
+          ctx.fillStyle = i > 15 ? '#ef4444' : (i > 9 ? '#f59e0b' : '#06b6d4');
+        } else if (isAbsence) {
+          // Vocal silence < 45 dB
+          val = (Math.sin(time * 2 + i * 0.3) * 0.12 + 0.18) * h * 0.35;
+          ctx.fillStyle = '#f59e0b';
+        } else if (isSmoke) {
+          // Secluded quiet stairwell
+          val = (Math.sin(time * 3 + i * 0.4) * 0.1 + 0.15) * h * 0.3;
+          ctx.fillStyle = '#a855f7';
+        } else {
+          // Normal lecture formant modulation (48 - 74 dB)
+          val = (Math.sin(time * 5 + i * 0.6) * 0.28 + 0.45) * h * 0.65;
+          ctx.fillStyle = i > 17 ? '#a855f7' : '#06b6d4';
+        }
+        const bHeight = Math.max(2, val);
+        ctx.fillRect(i * (barW + 2) + 1, h - bHeight, barW, bHeight);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // SENSOR HOVER TOOLTIP RAYCASTER
+    // -------------------------------------------------------------------------
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const tooltipEl = document.getElementById('sensor-hover-tooltip');
+
+    window.addEventListener('mousemove', (event) => {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      if (event.target.closest('header') || event.target.closest('aside') || event.target.closest('footer')) {
+        tooltipEl.classList.add('hidden');
+        return;
+      }
+
+      raycaster.setFromCamera(mouse, camera);
+      const meshes = sensorMarkers.map(m => m.core);
+      const hits = raycaster.intersectObjects(meshes);
+
+      if (hits.length > 0) {
+        const marker = sensorMarkers.find(m => m.core === hits[0].object);
+        if (marker) {
+          const d = marker.data;
+          document.getElementById('tt-icon').innerText = d.icon;
+          document.getElementById('tt-name').innerText = d.name;
+          document.getElementById('tt-room').innerText = `Room: ${d.room}`;
+          document.getElementById('tt-status').innerText = d.status;
+          document.getElementById('tt-reading').innerText = d.reading;
+          document.getElementById('tt-spec').innerText = d.spec;
+
+          tooltipEl.style.left = `${event.clientX}px`;
+          tooltipEl.style.top = `${event.clientY}px`;
+          tooltipEl.classList.remove('hidden');
+        }
+      } else {
+        tooltipEl.classList.add('hidden');
+      }
+    });
+
+    // Layer Overlays
+    function toggleNetworkVisuals(show) { packetGroup.visible = show; }
+    function togglePinsVisuals(show) { sensorMarkers.forEach(m => m.group.visible = show); }
+    function toggleEvacRoute(show) { evacGroup.visible = show; }
+    function toggleHeatmapVisuals(show) { Object.values(heatmapMeshes).forEach(m => m.visible = show); }
+    function toggleXRayMode(enable) { glassFacadeMat.opacity = enable ? 0.18 : 0.88; }
+
+    function appendLog(text, colorClass = 'text-slate-400') {
+      const container = document.getElementById('event-log-container');
+      const time = new Date().toTimeString().split(' ')[0];
+      const entry = document.createElement('div');
+      entry.className = colorClass;
+      entry.innerHTML = `<span class="text-cyan-400">[${time}]</span> ${text}`;
+      container.prepend(entry);
+    }
+    function clearEventLogs() { document.getElementById('event-log-container').innerHTML = ''; }
+
+    // -------------------------------------------------------------------------
+    // ANIMATION RENDER LOOP
+    // -------------------------------------------------------------------------
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const time = clock.getElapsedTime();
+
+      TWEEN.update();
+      controls.update();
+
+      sensorMarkers.forEach(m => {
+        m.ring.rotation.z += delta * 1.6;
+        const s = 1.0 + Math.sin(time * 3 + m.core.position.x) * 0.12;
+        m.ring.scale.set(s, s, s);
+      });
+
+      animatedPackets.forEach(pkt => {
+        pkt.progress = (pkt.progress + delta * 0.32) % 1.0;
+        pkt.mesh.position.copy(pkt.curve.getPoint(pkt.progress));
+      });
+
+      if (currentDrill === 'fire' || isEmergencyMode) {
+        strobeBeacon.material.emissiveIntensity = Math.sin(time * 14) > 0 ? 2.0 : 0.2;
+      }
+
+      if (smokeParticles && smokeParticles.material.opacity > 0.05) {
+        const pos = smokeParticles.geometry.attributes.position.array;
+        for (let i = 1; i < pos.length; i += 3) {
+          pos[i] += delta * 1.8;
+          if (pos[i] > 6.8) pos[i] = 1.0;
+        }
+        smokeParticles.geometry.attributes.position.needsUpdate = true;
+      }
+
+      if (puddleMesh && puddleMesh.material.opacity > 0.1) {
+        const s = 1.0 + Math.sin(time * 4) * 0.05;
+        puddleMesh.scale.set(s, 1, s);
+      }
+
+      drawAudioVU(time);
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "author": "Antigravity Smart Campus Engineering",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 240, "left": 280, "attrs": {} },
+    { "type": "wokwi-lcd2004", "id": "lcd", "top": 20, "left": 200, "attrs": { "pins": "i2c" } },
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": 30, "left": 580, "attrs": { "volume": "0.1" } },
+    
+    { "type": "wokwi-led", "id": "led_green", "top": 100, "left": 580, "attrs": { "color": "green", "label": "NORMAL / SAFE" } },
+    { "type": "wokwi-led", "id": "led_yellow", "top": 150, "left": 580, "attrs": { "color": "yellow", "label": "WARNING / ABSENT" } },
+    { "type": "wokwi-led", "id": "led_red", "top": 200, "left": 580, "attrs": { "color": "red", "label": "CRITICAL / FIGHT" } },
+    { "type": "wokwi-led", "id": "led_blue", "top": 250, "left": 580, "attrs": { "color": "blue", "label": "WATER LEAK" } },
+
+    { "type": "wokwi-pir-motion-sensor", "id": "pir_g01", "top": 40, "left": -40, "attrs": { "label": "PIR G01" } },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir_g02", "top": 140, "left": -40, "attrs": { "label": "PIR G02" } },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir_g03", "top": 240, "left": -40, "attrs": { "label": "PIR G03" } },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir_s01", "top": 340, "left": -40, "attrs": { "label": "PIR S01" } },
+
+    { "type": "wokwi-dht22", "id": "dht_g01", "top": 40, "left": 80, "attrs": { "label": "DHT G01" } },
+    { "type": "wokwi-dht22", "id": "dht_lab", "top": 140, "left": 80, "attrs": { "label": "DHT Lab" } },
+    { "type": "wokwi-dht22", "id": "dht_sem", "top": 240, "left": 80, "attrs": { "label": "DHT Sem" } },
+    { "type": "wokwi-dht22", "id": "dht_fac", "top": 340, "left": 80, "attrs": { "label": "DHT Fac" } },
+
+    { "type": "wokwi-gas-sensor", "id": "gas_lab", "top": 480, "left": 40, "attrs": { "label": "MQ-2 Lab Gas" } },
+    { "type": "wokwi-gas-sensor", "id": "gas_smoke", "top": 480, "left": 180, "attrs": { "label": "MQ-2 Smoke Sensor" } },
+    { "type": "wokwi-potentiometer", "id": "flame_lab", "top": 480, "left": 320, "attrs": { "label": "Flame Sensor (VP)" } },
+    { "type": "wokwi-potentiometer", "id": "mic_sensor", "top": 480, "left": 460, "attrs": { "label": "Acoustic / Mic (VN)" } },
+
+    { "type": "wokwi-pushbutton", "id": "btn_faculty", "top": 320, "left": 580, "attrs": { "color": "yellow", "label": "Btn 1: Faculty Absent" } },
+    { "type": "wokwi-pushbutton", "id": "btn_fight", "top": 380, "left": 580, "attrs": { "color": "red", "label": "Btn 2: Student Fight" } },
+    { "type": "wokwi-pushbutton", "id": "btn_emergency", "top": 440, "left": 580, "attrs": { "color": "purple", "label": "Btn 3: Emergency Mode" } },
+    { "type": "wokwi-pushbutton", "id": "btn_water", "top": 500, "left": 580, "attrs": { "color": "blue", "label": "Water Leak Sensor" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+
+    [ "lcd:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "lcd:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "lcd:SDA", "esp:21", "green", [ "v0" ] ],
+    [ "lcd:SCL", "esp:22", "blue", [ "v0" ] ],
+
+    [ "buzzer:2", "esp:GND.1", "black", [ "v0" ] ],
+    [ "buzzer:1", "esp:4", "orange", [ "v0" ] ],
+
+    [ "led_green:C", "esp:GND.1", "black", [ "v0" ] ],
+    [ "led_green:A", "esp:2", "green", [ "v0" ] ],
+
+    [ "led_yellow:C", "esp:GND.1", "black", [ "v0" ] ],
+    [ "led_yellow:A", "esp:12", "yellow", [ "v0" ] ],
+
+    [ "led_red:C", "esp:GND.1", "black", [ "v0" ] ],
+    [ "led_red:A", "esp:16", "red", [ "v0" ] ],
+
+    [ "led_blue:C", "esp:GND.1", "black", [ "v0" ] ],
+    [ "led_blue:A", "esp:17", "blue", [ "v0" ] ],
+
+    [ "pir_g01:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "pir_g01:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "pir_g01:OUT", "esp:32", "green", [ "v0" ] ],
+
+    [ "pir_g02:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "pir_g02:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "pir_g02:OUT", "esp:33", "green", [ "v0" ] ],
+
+    [ "pir_g03:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "pir_g03:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "pir_g03:OUT", "esp:25", "green", [ "v0" ] ],
+
+    [ "pir_s01:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "pir_s01:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "pir_s01:OUT", "esp:26", "green", [ "v0" ] ],
+
+    [ "dht_g01:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "dht_g01:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "dht_g01:SDA", "esp:27", "purple", [ "v0" ] ],
+
+    [ "dht_lab:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "dht_lab:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "dht_lab:SDA", "esp:14", "purple", [ "v0" ] ],
+
+    [ "dht_sem:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "dht_sem:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "dht_sem:SDA", "esp:13", "purple", [ "v0" ] ],
+
+    [ "dht_fac:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "dht_fac:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "dht_fac:SDA", "esp:15", "purple", [ "v0" ] ],
+
+    [ "gas_lab:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "gas_lab:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "gas_lab:AO", "esp:34", "gold", [ "v0" ] ],
+
+    [ "gas_smoke:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "gas_smoke:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "gas_smoke:AO", "esp:35", "gold", [ "v0" ] ],
+
+    [ "flame_lab:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "flame_lab:SIG", "esp:VP", "orange", [ "v0" ] ],
+    [ "flame_lab:VCC", "esp:3V3", "red", [ "v0" ] ],
+
+    [ "mic_sensor:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "mic_sensor:SIG", "esp:VN", "orange", [ "v0" ] ],
+    [ "mic_sensor:VCC", "esp:3V3", "red", [ "v0" ] ],
+
+    [ "btn_faculty:1.l", "esp:19", "yellow", [ "v0" ] ],
+    [ "btn_faculty:2.l", "esp:GND.2", "black", [ "v0" ] ],
+
+    [ "btn_fight:1.l", "esp:18", "red", [ "v0" ] ],
+    [ "btn_fight:2.l", "esp:GND.2", "black", [ "v0" ] ],
+
+    [ "btn_emergency:1.l", "esp:5", "purple", [ "v0" ] ],
+    [ "btn_emergency:2.l", "esp:GND.2", "black", [ "v0" ] ],
+
+    [ "btn_water:1.l", "esp:23", "blue", [ "v0" ] ],
+    [ "btn_water:2.l", "esp:GND.2", "black", [ "v0" ] ]
+  ]
+}
