@@ -75,6 +75,11 @@
       transform: translate(-50%, -120%);
     }
 
+    /* Cover Page Transition */
+    #cover-page-overlay {
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
     /* Bounding Box for CCTV */
     .yolo-box {
       border: 2px solid #ef4444;
@@ -88,6 +93,55 @@
   </style>
 </head>
 <body class="w-screen h-screen relative bg-[#030712] text-slate-100 overflow-hidden">
+
+  <!-- ========================================================================= -->
+  <!-- COVER PAGE HERO OVERLAY (EXACT FIT TO SCREEN)                              -->
+  <!-- ========================================================================= -->
+  <div id="cover-page-overlay" class="fixed inset-0 z-50 flex flex-col justify-between items-center bg-[#020617] overflow-hidden select-none">
+    <!-- Blurred Background Ambient Glow -->
+    <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+      <img src="./cover_page.jpg" alt="" class="w-full h-full object-cover filter blur-3xl opacity-35 scale-110">
+      <div class="absolute inset-0 bg-gradient-to-b from-[#020617]/75 via-[#020617]/40 to-[#020617]/90"></div>
+    </div>
+
+    <!-- Top Floating Header Bar on Cover Page -->
+    <div class="relative z-10 w-full px-5 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-3 bg-slate-900/85 backdrop-blur-md px-4 py-2 rounded-2xl border border-cyan-500/30 shadow-lg">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+        <span class="text-xs font-mono font-bold text-white uppercase tracking-wider">KLH SMART CAMPUS EVACUATION & SAFETY SYSTEM</span>
+        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">OFFICIAL COVER</span>
+      </div>
+
+      <button onclick="closeCoverPage()" class="group flex items-center gap-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-mono font-bold text-xs px-5 py-2.5 rounded-xl shadow-xl shadow-emerald-500/25 border border-emerald-400/50 transition-all transform hover:scale-105 active:scale-95">
+        <span>ENTER 3D COMMAND CENTER</span>
+        <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+      </button>
+    </div>
+
+    <!-- Main Cover Page Graphic - Exactly Fit to Screen -->
+    <div class="relative z-10 flex-1 w-full flex items-center justify-center p-2 sm:p-4 md:p-5 overflow-hidden">
+      <div class="relative w-full h-full flex items-center justify-center">
+        <img id="cover-main-img" src="./cover_page.jpg" alt="Smart Campus Evacuation System Cover" 
+             class="w-full h-full max-h-[82vh] object-contain rounded-2xl shadow-2xl border border-cyan-500/30 transition-transform duration-300 hover:scale-[1.01]" />
+      </div>
+    </div>
+
+    <!-- Bottom Floating Quick Launch Dock -->
+    <div class="relative z-10 w-full pb-4 pt-1 px-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400">
+      <div class="flex items-center gap-2">
+        <span class="px-2.5 py-1 rounded-lg bg-slate-900/85 border border-slate-700/60 text-slate-300">
+          Press <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-bold border border-slate-600">SPACE</kbd> or <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-bold border border-slate-600">ENTER</kbd> to Launch
+        </span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="closeCoverPage()" class="px-6 py-2.5 rounded-xl font-bold font-mono text-xs text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 hover:from-emerald-400 hover:to-cyan-500 shadow-xl shadow-emerald-500/30 border border-emerald-300/60 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95">
+          <span>🚀 LAUNCH 3D DIGITAL TWIN</span>
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- 3D Three.js WebGL Canvas (Full Background Viewport) -->
   <div id="webgl-container" class="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"></div>
@@ -174,6 +228,11 @@
 
     <!-- Master Action Buttons -->
     <div class="flex items-center gap-2">
+      <!-- 📖 COVER PAGE BUTTON -->
+      <button onclick="openCoverPage()" id="btn-cover-page" class="px-3 py-1.5 rounded-xl font-bold font-mono text-xs text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 shadow-lg shadow-emerald-500/20 border border-emerald-400/40 flex items-center gap-1.5 transition-all transform hover:scale-105" title="View Cover Page">
+        <span class="text-sm">📖</span> COVER PAGE
+      </button>
+
       <!-- 🚀 LIVE DEMO BUTTON -->
       <button onclick="toggleLiveDemoMode()" id="btn-live-demo" class="px-3 py-1.5 rounded-xl font-bold font-mono text-xs text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-500/25 border border-cyan-400/40 flex items-center gap-1.5 transition-all transform hover:scale-105">
         <span class="text-sm">🚀</span> LIVE DEMO
@@ -2166,6 +2225,39 @@
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // -------------------------------------------------------------------------
+    // COVER PAGE CONTROLLER
+    // -------------------------------------------------------------------------
+    let isCoverPageOpen = true;
+
+    function openCoverPage() {
+      const cover = document.getElementById('cover-page-overlay');
+      if (cover) {
+        cover.classList.remove('opacity-0', 'pointer-events-none', 'scale-95');
+        cover.classList.add('opacity-100', 'scale-100');
+        isCoverPageOpen = true;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+
+    function closeCoverPage() {
+      const cover = document.getElementById('cover-page-overlay');
+      if (cover) {
+        cover.classList.add('opacity-0', 'pointer-events-none', 'scale-95');
+        cover.classList.remove('opacity-100', 'scale-100');
+        isCoverPageOpen = false;
+      }
+      playBeep(880, 'sine', 0.1);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (isCoverPageOpen) {
+        if (e.code === 'Space' || e.code === 'Enter' || e.key === 'Escape') {
+          closeCoverPage();
+        }
+      }
     });
   </script>
 </body>

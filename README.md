@@ -1,6 +1,9 @@
-# 🏛️ CampusGuard 360° — Smart Campus Digital Twin Command Center
-**SIH Winner Edition | Industry 4.0 Autonomous Safety & IoT Command Infrastructure**
+# 🏛️ Smart Campus Evacuation & Safety System — CampusGuard 360°
+**KLH Smart Campus Digital Twin | SIH Winner Edition | Industry 4.0 Autonomous Safety**
 
+![Smart Campus Evacuation System Cover](./cover_page.jpg)
+
+### 3D Cutaway Architectural Model
 ![CampusGuard 360 3D Cutaway Architectural Model](./smart_campus_cutaway.jpg)
 
 CampusGuard 360° is an exhibition-grade, photorealistic 3D Digital Twin and Central Emergency Command Center engineered for university campuses. Designed with a **3D-first architecture**, all original monitoring, telemetry, and security surveillance capabilities are **100% preserved**, with new exhibition-ready presentation features added cleanly on top.
